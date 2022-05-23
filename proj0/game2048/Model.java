@@ -1,6 +1,5 @@
 package game2048;
 
-import javax.swing.table.TableRowSorter;
 import java.util.Formatter;
 import java.util.Observable;
 
