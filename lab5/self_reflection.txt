@@ -8,7 +8,7 @@ A:
 
 Q: What's something you felt proud of in your code, if anything?
 
-A:
+A: Created a new class LinkedListNode not mentioned in the introduction, and made the code much more elegant.
 
 Q: What's something that was particularly inelegant in your code, if anything?
 
