@@ -1,6 +1,8 @@
 package capers;
 
 import java.io.File;
+import java.io.IOException;
+
 import static capers.Utils.*;
 
 /** A repository for Capers 
@@ -18,7 +20,7 @@ public class CapersRepository {
     static final File CWD = new File(System.getProperty("user.dir"));
 
     /** Main metadata folder. */
-    static final File CAPERS_FOLDER = null; // TODO Hint: look at the `join`
+    static final File CAPERS_FOLDER = join(CWD, "capers"); // TODO Hint: look at the `join`
                                             //      function in Utils
 
     /**
@@ -30,8 +32,16 @@ public class CapersRepository {
      *    - dogs/ -- folder containing all of the persistent data for dogs
      *    - story -- file containing the current story
      */
-    public static void setupPersistence() {
+    public static void setupPersistence() throws IOException {
         // TODO
+        File story = join(CAPERS_FOLDER, "story.txt");
+        if (!story.exists()) {
+            story.createNewFile();
+        }
+        File dogs = join(CAPERS_FOLDER, "dogs");
+        if (!dogs.exists()) {
+            dogs.mkdir();
+        }
     }
 
     /**
@@ -41,15 +51,32 @@ public class CapersRepository {
      */
     public static void writeStory(String text) {
         // TODO
+        File story = join(CAPERS_FOLDER, "story.txt");
+        writeObject(story, readObject(story, String.class) + text + '\n');
     }
 
+
+    /**
+     * Print out the current story in story.txt
+     */
+    public static void printStory() {
+        File story = join(CAPERS_FOLDER, "story.txt");
+        System.out.println(readObject(story, String.class));
+    }
     /**
      * Creates and persistently saves a dog using the first
      * three non-command arguments of args (name, breed, age).
      * Also prints out the dog's information using toString().
      */
-    public static void makeDog(String name, String breed, int age) {
+    public static void makeDog(String name, String breed, int age) throws IOException {
         // TODO
+        Dog dog = new Dog(name, breed, age);
+        File file = new File(name + ".txt");
+        if (!file.exists()) {
+            file.createNewFile();
+        }
+        writeObject(file, dog);
+        System.out.println(dog.toString());
     }
 
     /**
@@ -60,5 +87,9 @@ public class CapersRepository {
      */
     public static void celebrateBirthday(String name) {
         // TODO
+        Dog dog = Dog.fromFile(name);
+        dog.haveBirthday();
+        writeObject(new File(name + ".txy"), dog);
+        System.out.println(dog.toString());
     }
 }
