@@ -59,17 +59,13 @@ public class Main {
             String name = args[1];
             String breed = args[2];
             int age = Integer.parseInt(args[3]);
-            Dog dog = new Dog(name, breed, age);
-            System.out.println(dog.toString());
-            dog.saveDog();
+            CapersRepository.makeDog(name, breed, age);
             break;
         case "birthday":
             validateNumArgs("birthday", args, 2);
             // TODO: celebrate this dog's birthday
             String dog_name = args[1];
-            Dog cur_dog = Dog.fromFile(dog_name);
-            cur_dog.haveBirthday();
-            cur_dog.saveDog();
+            CapersRepository.celebrateBirthday(dog_name);
             break;
         default:
             exitWithError(String.format("Unknown command: %s", args[0]));

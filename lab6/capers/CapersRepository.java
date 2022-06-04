@@ -22,7 +22,9 @@ public class CapersRepository {
     /** Main metadata folder. */
     static final File CAPERS_FOLDER = join(CWD, "capers"); // TODO Hint: look at the `join`
                                             //      function in Utils
+    static final File DOGS_FOLDER = join(CAPERS_FOLDER, "dogs");
 
+    static final File STORY = join(CAPERS_FOLDER, "story.txt");
     /**
      * Does required filesystem operations to allow for persistence.
      * (creates any necessary folders or files)
@@ -34,13 +36,11 @@ public class CapersRepository {
      */
     public static void setupPersistence() throws IOException {
         // TODO
-        File story = join(CAPERS_FOLDER, "story.txt");
-        if (!story.exists()) {
-            story.createNewFile();
+        if (!DOGS_FOLDER.exists()) {
+            DOGS_FOLDER.mkdir();
         }
-        File dogs = join(CAPERS_FOLDER, "dogs");
-        if (!dogs.exists()) {
-            dogs.mkdir();
+        if (!STORY.exists()) {
+            STORY.createNewFile();
         }
     }
 
@@ -51,17 +51,20 @@ public class CapersRepository {
      */
     public static void writeStory(String text) {
         // TODO
-        File story = join(CAPERS_FOLDER, "story.txt");
-        writeObject(story, readObject(story, String.class) + text + '\n');
-    }
+        String pre_story = Utils.readContentsAsString(STORY);
+        if (!pre_story.equals("")) {
+            Utils.writeContents(STORY, pre_story + '\n' + text);
+        } else {
+            Utils.writeContents(STORY, text);
+        }
+    };
 
 
     /**
      * Print out the current story in story.txt
      */
     public static void printStory() {
-        File story = join(CAPERS_FOLDER, "story.txt");
-        System.out.println(readObject(story, String.class));
+        System.out.println(Utils.readContentsAsString(STORY));
     }
     /**
      * Creates and persistently saves a dog using the first
@@ -71,7 +74,7 @@ public class CapersRepository {
     public static void makeDog(String name, String breed, int age) throws IOException {
         // TODO
         Dog dog = new Dog(name, breed, age);
-        File file = new File(name + ".txt");
+        File file = join(DOGS_FOLDER, name + ".txt");
         if (!file.exists()) {
             file.createNewFile();
         }
@@ -85,11 +88,10 @@ public class CapersRepository {
      * Chooses dog to advance based on the first non-command argument of args.
      * @param name String name of the Dog whose birthday we're celebrating.
      */
-    public static void celebrateBirthday(String name) {
+    public static void celebrateBirthday(String name) throws IOException {
         // TODO
         Dog dog = Dog.fromFile(name);
         dog.haveBirthday();
-        writeObject(new File(name + ".txy"), dog);
-        System.out.println(dog.toString());
+        dog.saveDog();
     }
 }

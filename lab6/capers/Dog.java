@@ -11,7 +11,7 @@ import static capers.Utils.*;
 public class Dog implements Serializable { // TODO
 
     /** Folder that dogs live in. */
-    static final File DOG_FOLDER = null; // TODO (hint: look at the `join`
+    static final File DOG_FOLDER = CapersRepository.DOGS_FOLDER; // TODO (hint: look at the `join`
                                          //      function in Utils)
 
     /** Age of dog. */
@@ -41,14 +41,18 @@ public class Dog implements Serializable { // TODO
      */
     public static Dog fromFile(String name) {
         // TODO (hint: look at the Utils file)
-        File dogFile = new File(name + ".txt");
+        File dogFile = join(Dog.DOG_FOLDER, name + ".txt");
+        if (!dogFile.exists()) {
+            System.out.printf("Dog %s not exists!", name);
+            return null;
+        }
         return readObject(dogFile, Dog.class);
     }
 
     /**
      * Increases a dog's age and celebrates!
      */
-    public void haveBirthday() {
+    public void haveBirthday() throws IOException {
         age += 1;
         System.out.println(toString());
         System.out.println("Happy birthday! Woof! Woof!");
@@ -59,7 +63,11 @@ public class Dog implements Serializable { // TODO
      */
     public void saveDog() throws IOException {
         // TODO (hint: don't forget dog names are unique)
-        File file = new File(name + ".txt");
+        if (name == null) {
+            System.out.println("Dog not exists!");
+            return;
+        }
+        File file = join(Dog.DOG_FOLDER, name + ".txt");
         if (!file.exists()) {
             file.createNewFile();
         }
