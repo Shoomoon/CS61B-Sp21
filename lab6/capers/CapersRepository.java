@@ -36,6 +36,9 @@ public class CapersRepository {
      */
     public static void setupPersistence() throws IOException {
         // TODO
+        if (!CAPERS_FOLDER.exists()) {
+            CAPERS_FOLDER.mkdir();
+        }
         if (!DOGS_FOLDER.exists()) {
             DOGS_FOLDER.mkdir();
         }
