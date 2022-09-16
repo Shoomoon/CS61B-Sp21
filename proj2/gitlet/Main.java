@@ -31,7 +31,7 @@ public class Main {
                  * 1.4. create a commit with "initial commit" message and date(0).
                  * 1.5. make the head pointer of new branch "master" points to this commit.*/
                 File gitletDir = Repository.GITLETDIR;
-                if (!gitletDir.exists()) {
+                if (gitletDir.exists()) {
                     throw new GitletException("A Gitlet version-control system already exists in the current directory.");
                 }
                 Repository.initial();
@@ -47,21 +47,23 @@ public class Main {
                  * 2.3. remove previous copy in STAGE of same file if in STAGE;
                  * 2.4. write in a new file in STAGE. */
                 String fileName = args[1];
-                File addedFile = new File(Repository.CWD, fileName);
-                if (!addedFile.isFile()) {
+                File fileToAdd = new File(Repository.CWD, fileName);
+                if (!fileToAdd.isFile()) {
                     throw new GitletException(String.format("Illegal file name: %s", fileName));
                 }
-                if (!addedFile.exists()) {
+                if (!fileToAdd.exists()) {
                     throw new GitletException("File does not exist.");
                 }
                 Branch branch = Branch.getBranch();
                 Commit currentCommit = branch.getCurrentCommit();
-                File currentFile = currentCommit.getFile(fileName);
+                String blobId = currentCommit.getBlobId(fileName);
                 File stagedFile = Utils.join(Repository.STAGEADD, fileName);
-                if (Repository.sameFile(addedFile, currentFile)) {
-                    stagedFile.delete();
+                if (Repository.sameWithBlob(fileToAdd, blobId)) {
+                    if (stagedFile.exists()) {
+                        stagedFile.delete();
+                    }
                 } else {
-                    Repository.copyFile(addedFile, stagedFile);
+                    Repository.copyFile(fileToAdd, stagedFile);
                 }
                 break;
             // TODO: FILL THE REST IN
@@ -91,10 +93,12 @@ public class Main {
                 HashMap<String, String> trackedFiles = currentCommit.getTrackedFiles();
                 for (File file: filesInStageAdd) {
                     String file_name = file.getName();
-                    String fileId = Repository.getFileHashVal(file);
-                    String fileIdWithEx = Repository.toFileNameWithEx(file_name, fileId);
-                    trackedFiles.put(file_name, fileIdWithEx);
-                    Repository.copyFile(file, Utils.join(Repository.BLOBS, fileIdWithEx));
+                    String blobName = Repository.getBlobName(file);
+                    trackedFiles.put(file_name, blobName);
+                    File blobFile = Utils.join(Repository.BLOBS, blobName);
+                    if (!blobFile.exists()) {
+                        Repository.copyFile(file, blobFile);
+                    }
                 }
                 for (String file_name: filesInStageRemove) {
                     trackedFiles.remove(file_name);
@@ -120,20 +124,22 @@ public class Main {
                 fileName = args[1];
                 File fileInStageAdd = Utils.join(Repository.STAGEADD, fileName);
                 if (fileInStageAdd.exists()) {
-                    fileInStageAdd.delete();
                     stagedOrTracked = true;
+                    fileInStageAdd.delete();
                 }
                 branch = Branch.getBranch();
                 currentCommit = branch.getCurrentCommit();
                 if (currentCommit.isTracked(fileName)) {
+                    stagedOrTracked = true;
                     /** stage for removal*/
                     HashSet<String> removedFiles = Repository.getRemovedFilesList();
                     removedFiles.add(fileName);
                     Repository.saveRemovedFilesList(removedFiles);
                     /** remove the file from CWD*/
                     File fileInCWD = Utils.join(Repository.CWD, fileName);
-                    fileInCWD.delete();
-                    stagedOrTracked = true;
+                    if (fileInCWD.exists()) {
+                        fileInCWD.delete();
+                    }
                 }
                 if(!stagedOrTracked) {
                     throw new GitletException("No reason to remove the file.");
@@ -148,10 +154,10 @@ public class Main {
                  * */
                 branch = Branch.getBranch();
                 String currentCommitId = branch.getCurrentCommitId();
-                while (currentCommitId != null) {
-                    Commit commit = Commit.fromFile(currentCommitId);
+                while (currentCommitId != null && !currentCommitId.isEmpty()) {
+                    Commit commit = Commit.fromCommitId(currentCommitId);
                     commit.printCommit(currentCommitId);
-                    currentCommitId = commit.getParent1();
+                    currentCommitId = commit.getFirstParent();
                 }
                 break;
 
@@ -179,6 +185,7 @@ public class Main {
                  * */
                 message = args[1];
                 commitFiles = Repository.COMMITS.listFiles();
+                boolean hasMessage = false;
                 for (File commitFile: commitFiles) {
                     if (!commitFile.isFile()) {
                         continue;
@@ -187,7 +194,11 @@ public class Main {
                     String commitId = Repository.getFileNameNoEx(commitFile.getName());
                     if (commit.getMessage().contains(message)) {
                         System.out.printf("%s\n", commitId);
+                        hasMessage = true;
                     }
+                }
+                if (!hasMessage) {
+                    System.out.print("Found no commit with that message.");
                 }
                 break;
             case "status":
@@ -205,7 +216,7 @@ public class Main {
                 System.out.printf("=== Branches ===\n");
                 ArrayList<String> branchNames = branch.getAllBranchNames();
                 Collections.sort(branchNames);
-                String currentBranchName = branch.currentBranchName();
+                String currentBranchName = branch.getCurrentBranchName();
                 for (String branchName: branchNames) {
                     if (branchName.equals(currentBranchName)) {
                         System.out.print("*");
@@ -216,15 +227,15 @@ public class Main {
                 /** print files in Stage add directory */
                 System.out.printf("=== Staged Files ===\n");
                 List<String> addedFiles = Utils.plainFilenamesIn(Repository.STAGEADD);
-                for (String file : addedFiles) {
+                for (String file: addedFiles) {
                     System.out.printf("%s\n", file);
                 }
                 System.out.print("\n\n");
                 /** print removed files */
                 System.out.print("=== Removed Files ===\n");
-                ArrayList<String> removedFiles = new ArrayList<>(Repository.getRemovedFilesList());
+                HashSet<String> removedFilesSet = Repository.getRemovedFilesList();
+                ArrayList<String> removedFiles = new ArrayList<>(removedFilesSet);
                 Collections.sort(removedFiles);
-                HashSet<String> removedFilesSet = new HashSet<>(removedFiles);
                 for (String removedFileName: removedFiles) {
                     System.out.printf("%s\n", removedFileName);
                 }
@@ -237,7 +248,7 @@ public class Main {
                     File file = Utils.join(Repository.CWD, file_name);
                     fileInStageAdd = Utils.join(Repository.STAGEADD, file_name);
                     boolean staged = fileInStageAdd.exists() || removedFilesSet.contains(file_name);
-                    if (currentCommit.isTracked(file_name) && !Repository.sameFile(currentCommit.getFile(file_name), file) && staged
+                    if (currentCommit.isTracked(file_name) && !Repository.sameWithBlob(file, currentCommit.getBlobId(file_name)) && !staged
                             || fileInStageAdd.exists() && !Repository.sameFile(fileInStageAdd, file)) {
                         System.out.printf("%s (modified)\n", file_name);
                     } else if (fileInStageAdd.exists() && !file.exists()
@@ -295,7 +306,7 @@ public class Main {
                         throw new GitletException("No commit with that id exists.");
                     }
                     Commit commit = Commit.fromFile(commitFile);
-                    file = commit.getFile(fileName);
+                    file = commit.getBlob(fileName);
                     if (file == null) {
                         throw new GitletException("File does not exist in that commit.");
                     }
@@ -305,7 +316,7 @@ public class Main {
                     if (!branch.containBranch(branchName)) {
                         throw new GitletException("No such branch exists.");
                     }
-                    if (!branchName.equals(branch.getHeadCommitId())) {
+                    if (!branchName.equals(branch.getCurrentBranchName())) {
                         throw new GitletException("No need to checkout the current branch.");
                     }
                     currentCommit = branch.getCurrentCommit();
@@ -327,7 +338,7 @@ public class Main {
                         File target = Utils.join(Repository.CWD, fileTrackedInTargetCommit);
                         Repository.copyFile(source, target);
                     }
-                    branch.setCurrentBranch(branchName);
+                    branch.setCurrentBranchName(branchName);
                 }
                 break;
             case "branch":
@@ -353,7 +364,7 @@ public class Main {
                 if (!branch.containBranch(branchNameToDelete)) {
                     throw new GitletException("A branch with that name does not exist.");
                 }
-                if (branch.getHeadCommitId().equals(branchNameToDelete)) {
+                if (branch.getCurrentBranchName().equals(branchNameToDelete)) {
                     throw new GitletException("Cannot remove the current branch.");
                 }
                 branch.removeBranch(branchNameToDelete);

@@ -2,8 +2,6 @@ package gitlet;
 
 // TODO: any imports you need here
 
-import jdk.jshell.execution.Util;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -31,12 +29,12 @@ public class Commit implements Serializable {
     private String message;
     private String author;
     private Date commitTime;
-    private String parent1;
-    private String parent2;
-    static final String DATAFILETYPE = Branch.DATAFILETYPE;
+    private String firstParent;
+    private String secondParent;
+    static final String DATAFILETYPE = Repository.DATAFILETYPE;
     static final File BLOBS = Repository.BLOBS;
     static final int COMMITIDLENGTH = 7;
-    /** fileName maps to fileId, including extension*/
+    /** fileName maps to blobId, both including extension*/
     private HashMap<String, String> trackedFiles;
     static final File COMMITS = Repository.COMMITS;
     /* TODO: fill in the rest of this class. */
@@ -44,55 +42,68 @@ public class Commit implements Serializable {
         message = meg;
         author = aut;
         commitTime = date;
-        parent1 = p1;
-        parent2 = p2;
+        firstParent = p1;
+        secondParent = p2;
         trackedFiles = files;
     }
-    /** get hash value of the commit, combine the content with "commit"*/
+    /** get hash value of the commit, combine the content with "commit", no extension*/
     public String getCommitId() {
         byte[] content = Utils.serialize(this);
-        return Utils.sha1((Object) content, "commit");
+        return Utils.sha1((Object) content, "commit", DATAFILETYPE);
     }
     /** get the file ID of a file, extension included*/
-    public String getFileId(String fileName) {
+    public String getBlobId(String fileName) {
         if (!trackedFiles.containsKey(fileName)) {
             return null;
         }
         return trackedFiles.get(fileName);
     }
     /** get the file that this commit is tracking by the name of the file (extension included)*/
-    public File getFile(String fileName) {
-        if (!trackedFiles.containsKey(fileName)) {
-            return null;
-        }
-        String fileId = trackedFiles.get(fileName);
+    public File getBlob(String fileName) {
+        String fileId = getBlobId(fileName);
         return Utils.join(BLOBS, fileId);
     }
-    /***/
-    public String getParent1() {
-        return parent1;
+    public static void exists(String commitId) {
+        if (commitId == null) {
+            throw new GitletException("Commit should not be empty.");
+        }
+        File commitFile = join(COMMITS, toFileName(commitId));
+        exists(commitFile);
     }
-    /** get the */
+    public static void exists(File commitFile) {
+        if (!commitFile.exists()) {
+            throw new GitletException(String.format("Commit %s not exists", commitFile.toString()));
+        }
+    }
+    /** get the parent 1*/
+    public String getFirstParent() {
+        return firstParent;
+    }
+    public String getSecondParent() { return secondParent; }
+    public Date getCommitTime() { return commitTime; }
+    public String getMessage() {
+        return message;
+    }
+    /** get the tracking files hash map*/
     public HashMap<String, String> getTrackedFiles() {
         return trackedFiles;
     }
     public static String toFileName(String fileName) {
         return fileName + "." + DATAFILETYPE;
     }
-    public static Commit fromFile(String commitId) {
+    public static Commit fromCommitId(String commitId) {
+        exists(commitId);
         File commitFile = join(COMMITS, toFileName(commitId));
-        return fromFile(commitFile);
+        return readObject(commitFile, Commit.class);
     }
     public static Commit fromFile(File commitFile) {
-        if (!commitFile.exists()) {
-            throw new GitletException(String.format("Commit %s not exists.", commitFile.toString()));
-        }
+        exists(commitFile);
         return readObject(commitFile, Commit.class);
     }
     /** Save the commit and return the commit ID*/
     public String saveCommit() throws IOException {
         byte[] content = Utils.serialize(this);
-        String commitId = Utils.sha1(content);
+        String commitId = getCommitId();
         File file = join(COMMITS, toFileName(commitId));
         if (!file.exists()) {
             file.createNewFile();
@@ -105,19 +116,20 @@ public class Commit implements Serializable {
         commit.printCommit(Repository.getFileNameNoEx(commitFile.getName()));
     }
     /** print commit by commit ID(no extension)*/
-    public void printCommit(String commitFileName) {
+    public void printCommit(String commitId) {
         System.out.print("===\n");
-        System.out.printf("commit %s\n", commitFileName);
-        if(parent2 != null) {
-            System.out.printf("Merge: %s, %s\n", parent1.substring(0, COMMITIDLENGTH), parent2.substring(0, COMMITIDLENGTH));
+        System.out.printf("commit %s\n", commitId);
+        if(secondParent != null) {
+            System.out.printf("Merge: %s, %s\n", firstParent.substring(0, COMMITIDLENGTH), secondParent.substring(0, COMMITIDLENGTH));
         }
         System.out.printf("Date: %s\n", commitTime.toString());
         System.out.printf("%s\n\n", message);
     }
-    public String getMessage() {
-        return message;
+    public static void printCommitById(String commitId) {
+        Commit commit = Commit.fromCommitId(commitId);
+        commit.printCommit(commitId);
     }
     public boolean isTracked(String fileNameWithEx) {
-        return trackedFiles.containsKey(fileNameWithEx);
+        return fileNameWithEx != null && trackedFiles.containsKey(fileNameWithEx);
     }
 }

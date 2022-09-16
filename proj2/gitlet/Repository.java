@@ -1,7 +1,5 @@
 package gitlet;
 
-import edu.princeton.cs.algs4.ST;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -30,14 +28,15 @@ public class Repository implements Serializable {
     static final File CWD = new File(System.getProperty("user.dir"));
     /** The .gitlet directory. */
     static final File GITLETDIR = join(CWD, ".gitlet");
+    /** The blobs directory. */
+    static final File BLOBS = join(GITLETDIR, "blobs");
+    static final File BRANCH = join(GITLETDIR, "branch");
     static final File COMMITS = join(GITLETDIR, "commits");
     /** The stage directory. */
     static final File STAGE = join(GITLETDIR, "stage");
     static final File STAGEADD = join(STAGE, "add");
-    static final File STAGEREMOVEDIR = join(STAGE, "remove");
-    static final File STAGEREMOVE = join(STAGEREMOVEDIR, toFileName("remove"));
-    /** The blobs directory. */
-    static final File BLOBS = join(GITLETDIR, "blobs");
+    static final File STAGEREMOVE = join(STAGE, "remove");
+    static final File STAGEREMOVEFILES = join(STAGEREMOVE, toFileName("removedFiles"));
     static final String AUTHOR = "XiaomingQiu";
     static final String DATAFILETYPE = "txt";
 
@@ -48,11 +47,12 @@ public class Repository implements Serializable {
 //    /** initial repository is not exist */
     public static void initial() throws IOException {
         GITLETDIR.mkdir();
+        BRANCH.mkdir();
         COMMITS.mkdir();
         STAGE.mkdir();
         STAGEADD.mkdir();
-        STAGEREMOVEDIR.mkdir();
-        STAGEREMOVE.createNewFile();
+        STAGEREMOVE.mkdir();
+        STAGEREMOVEFILES.createNewFile();
         BLOBS.mkdir();
         Commit initial_commit = new Commit("initial commit", AUTHOR, new Date(0), null, null, null);
         String initial_commitID = initial_commit.saveCommit();
@@ -72,28 +72,13 @@ public class Repository implements Serializable {
      * */
     public void addCommit(String meg, String p2, HashMap<String, String> files) {
         Branch branch = Branch.getBranch();
-        Commit commit = new Commit(meg, AUTHOR, new Date(), branch.currentBranchName(), p2, files);
+        Commit commit = new Commit(meg, AUTHOR, new Date(), branch.getCurrentCommitId(), p2, files);
         byte[] content = Utils.serialize(commit);
         String commitId = Utils.sha1((Object) content);
         File file = Utils.join(COMMITS, Commit.toFileName(commitId));
     }
-    public File getCommitFile(String commitId) {
-        return Utils.join(COMMITS, Commit.toFileName(commitId));
-    }
-    public Commit getCommit(String commitId) {
-        File commitFile = getCommitFile(commitId);
-        if (!commitFile.exists()) {
-            return null;
-        }
-        return readObject(commitFile, Commit.class);
-    }
     public static String toFileName(String name) {
         return name + "." + DATAFILETYPE;
-    }
-    public static void checkFile(File file) {
-        if (!file.exists()) {
-            throw new GitletException(String.format("%s not exists.", file.toString()));
-        }
     }
     public static void creatFileIfNotExist(File file) throws IOException {
         if (!file.exists()) {
@@ -104,7 +89,10 @@ public class Repository implements Serializable {
     public static boolean sameFile(File file0, File file1) {
         return getFileHashVal(file0).equals(getFileHashVal(file1));
     }
-    /** get the extension of a file named fileName*/
+    public static boolean sameWithBlob(File file, String blobName) {
+        return getFileHashVal(file).equals(getFileNameNoEx(blobName));
+    }
+    /** get the extension of a file named fileName for example: ".txt"*/
     public static String getExtension(String fileName) {
         int dot = fileName.lastIndexOf('.');
         if (dot >= 0) {
@@ -124,25 +112,20 @@ public class Repository implements Serializable {
         byte[] contents = Utils.readContents(file);
         return Utils.sha1((Object) contents, "file", getExtension(file));
     }
-    /** add the extension of file to fileId*/
-    public static String toFileNameWithEx(File file, String fileId) {
+    /** get the file name in BLOBS: fileHashValue.ex*/
+    public static String getBlobName(File file) {
         isFile(file);
         String fileName = file.getName();
-        return toFileNameWithEx(fileName, fileId);
-    }
-    /** get the file name in BLOBS: fileHashValue.ex */
-    public static String getFileNameWithEx(File file) {
-        isFile(file);
-        String fileId = getFileHashVal(file);
-        return toFileNameWithEx(file, fileId);
-    }
-    /** add the extension of fileName to fileId*/
-    public static String toFileNameWithEx(String fileName, String fileId) {
+        String blobId = getFileHashVal(file);
         int dot = fileName.lastIndexOf('.');
-        if (dot < 0) {
-            throw new GitletException(String.format("%s is not a file.", fileName));
+        return blobId + fileName.substring(dot);
+    }
+    public static void saveFileToBlob(File file) throws IOException {
+        String blobName = getBlobName(file);
+        File blobFile = join(BLOBS, blobName);
+        if (blobFile.exists()) {
+            copyFile(file, blobFile);
         }
-        return fileId + fileName.substring(dot);
     }
     public static String getFileNameNoEx(String fileName) {
         if (fileName != null && fileName.length() > 0) {
@@ -164,31 +147,27 @@ public class Repository implements Serializable {
         }
     }
     public static void copyFile(File source, File target) throws IOException {
-        isFile(source);
-        isFile(target);
-        if(!source.exists()) {
-            throw new GitletException(String.format("File %s not exists.", source.toString()));
-        }
         creatFileIfNotExist(target);
         byte[] content = readContents(source);
         writeContents(target, (Object) content);
     }
-    public static HashSet<String> getRemovedFilesList() {
-        File removedFiles = join(STAGEREMOVE, toFileName("removedFiles"));
-        if (!removedFiles.exists()) {
+    public static HashSet<String> getRemovedFilesList() throws IOException {
+        if (!STAGEREMOVEFILES.exists()) {
+            System.out.print("Removed files not initialized");
+            STAGEREMOVEFILES.createNewFile();
             return new HashSet<String>();
         }
-        return readObject(removedFiles, HashSet.class);
+        return readObject(STAGEREMOVEFILES, HashSet.class);
     }
-    public static void saveRemovedFilesList(HashSet<String> removedFilesList) {
-        File removedFiles = join(STAGEREMOVE, toFileName("removedFiles"));
-        writeObject(removedFiles, removedFilesList);
+    public static void saveRemovedFilesList(HashSet<String> removedFilesList) throws IOException {
+        creatFileIfNotExist(STAGEREMOVEFILES);
+        writeObject(STAGEREMOVEFILES, removedFilesList);
     }
-    public static void clearStage() {
+    public static void clearStage() throws IOException {
         for (File file : STAGEADD.listFiles()) {
             file.delete();
         }
-        File removedFiles = join(STAGEREMOVE, toFileName("removedFiles"));
-        writeObject(removedFiles, new HashSet<String>());
+        creatFileIfNotExist(STAGEREMOVEFILES);
+        writeObject(STAGEREMOVEFILES, new HashSet<String>());
     }
 }
