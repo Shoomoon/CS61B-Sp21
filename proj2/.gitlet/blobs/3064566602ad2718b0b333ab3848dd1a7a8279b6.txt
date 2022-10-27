@@ -1,4 +1,0 @@
-Name: Xiaoming Qiu
-Author: Xiaoming Qiu
-Date: 10/26/2022
-Modify: first time

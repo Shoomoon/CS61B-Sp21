@@ -1,5 +1,0 @@
-Name: Chen Wang
-Author: Xiaoming Qiu
-Date: 10/26/2022
-Modify Id: 1
-Modify Id: 2
