@@ -53,8 +53,9 @@ public class Repository implements Serializable {
         STAGEADD.mkdir();
         STAGEREMOVE.mkdir();
         STAGEREMOVEFILES.createNewFile();
+        writeObject(STAGEREMOVEFILES, new HashSet<String>());
         BLOBS.mkdir();
-        Commit initial_commit = new Commit("initial commit", AUTHOR, new Date(0), null, null, null);
+        Commit initial_commit = new Commit("initial commit", AUTHOR, new Date(0), null, null, new HashMap<>());
         String initial_commitID = initial_commit.saveCommit();
         Branch branch = new Branch(initial_commitID, "master");
         branch.saveBranch();
@@ -152,11 +153,6 @@ public class Repository implements Serializable {
         writeContents(target, (Object) content);
     }
     public static HashSet<String> getRemovedFilesList() throws IOException {
-        if (!STAGEREMOVEFILES.exists()) {
-            System.out.print("Removed files not initialized");
-            STAGEREMOVEFILES.createNewFile();
-            return new HashSet<String>();
-        }
         return readObject(STAGEREMOVEFILES, HashSet.class);
     }
     public static void saveRemovedFilesList(HashSet<String> removedFilesList) throws IOException {

@@ -48,9 +48,6 @@ public class Main {
                  * 2.4. write in a new file in STAGE. */
                 String fileName = args[1];
                 File fileToAdd = new File(Repository.CWD, fileName);
-                if (!fileToAdd.isFile()) {
-                    throw new GitletException(String.format("Illegal file name: %s", fileName));
-                }
                 if (!fileToAdd.exists()) {
                     throw new GitletException("File does not exist.");
                 }
@@ -79,6 +76,7 @@ public class Main {
                  * 3.4. make the head pointer of current branch points to this commit.
                  * 3.5. clear STAGE.
                  * */
+                Boolean addedOrRemoved = false;
                 File[] filesInStageAdd = Repository.STAGEADD.listFiles();
                 HashSet<String> filesInStageRemove = Repository.getRemovedFilesList();
                 if (filesInStageAdd == null && filesInStageRemove == null) {
@@ -99,9 +97,14 @@ public class Main {
                     if (!blobFile.exists()) {
                         Repository.copyFile(file, blobFile);
                     }
+                    addedOrRemoved = true;
                 }
                 for (String file_name: filesInStageRemove) {
                     trackedFiles.remove(file_name);
+                    addedOrRemoved = true;
+                }
+                if (!addedOrRemoved) {
+                    throw new GitletException("No changes added to the commit.");
                 }
                 branch.addCommitToCurrentBranch(message, Repository.AUTHOR, null, trackedFiles);
                 Repository.clearStage();
@@ -223,25 +226,23 @@ public class Main {
                     }
                     System.out.printf("%s\n", branchName);
                 }
-                System.out.print("\n\n");
+                System.out.print("\n");
                 /** print files in Stage add directory */
-                System.out.printf("=== Staged Files ===\n");
+                System.out.printf("\n=== Staged Files ===\n");
                 List<String> addedFiles = Utils.plainFilenamesIn(Repository.STAGEADD);
                 for (String file: addedFiles) {
                     System.out.printf("%s\n", file);
                 }
-                System.out.print("\n\n");
                 /** print removed files */
-                System.out.print("=== Removed Files ===\n");
+                System.out.print("\n=== Removed Files ===\n");
                 HashSet<String> removedFilesSet = Repository.getRemovedFilesList();
                 ArrayList<String> removedFiles = new ArrayList<>(removedFilesSet);
                 Collections.sort(removedFiles);
                 for (String removedFileName: removedFiles) {
                     System.out.printf("%s\n", removedFileName);
                 }
-                System.out.print("\n\n");
                 /** check files in CWD if they are modified but not staged for commit, or untracked */
-                System.out.print("=== Modifications Not Staged For Commit ===\n");
+                System.out.print("\n=== Modifications Not Staged For Commit ===\n");
                 List<String> untrackedFiles = new LinkedList<String>();
                 List<String> filesInCWD = Utils.plainFilenamesIn(Repository.CWD);
                 for (String file_name: filesInCWD) {
@@ -258,13 +259,12 @@ public class Main {
                         untrackedFiles.add(file_name);
                     }
                 }
-                System.out.print("\n\n");
                 /** print untracked files*/
-                System.out.print("=== Untracked Files ===\n");
+                System.out.print("\n=== Untracked Files ===\n");
                 for (String file_name : untrackedFiles) {
                     System.out.printf("%s\n", file_name);
                 }
-                System.out.print("\n\n");
+                System.out.print("\n");
                 break;
             case "checkout":
                 /** 9. "checkout": checkout -- [file name]; checkout [commit id] -- [file name]; checkout [branch name].
@@ -291,7 +291,7 @@ public class Main {
                  * */
                 branch = Branch.getBranch();
                 if (args.length > 2) {
-                    String commitId = null;
+                    String commitId;
                     fileName = "";
                     File file = null;
                     if (args[1].equals("--")) {
@@ -306,17 +306,17 @@ public class Main {
                         throw new GitletException("No commit with that id exists.");
                     }
                     Commit commit = Commit.fromFile(commitFile);
-                    file = commit.getBlob(fileName);
-                    if (file == null) {
+                    if (!commit.isTracked(fileName)) {
                         throw new GitletException("File does not exist in that commit.");
                     }
-                    Repository.copyFile(file, Utils.join(Repository.CWD, fileName));
+                    File blob = commit.getBlob(fileName);
+                    Repository.copyFile(blob, Utils.join(Repository.CWD, fileName));
                 } else {
                     String branchName = args[1];
                     if (!branch.containBranch(branchName)) {
                         throw new GitletException("No such branch exists.");
                     }
-                    if (!branchName.equals(branch.getCurrentBranchName())) {
+                    if (branchName.equals(branch.getCurrentBranchName())) {
                         throw new GitletException("No need to checkout the current branch.");
                     }
                     currentCommit = branch.getCurrentCommit();
@@ -327,8 +327,8 @@ public class Main {
                             throw new GitletException("There is an untracked file in the way; delete it, or add and commit it first.");
                         }
                     }
-                    for (String fileNameInCWD : files) {
-                        File file = Utils.join(Repository.CWD, fileNameInCWD);
+                    for (String fileTrackedInCurrentCommit : currentCommit.getTrackedFiles().keySet()) {
+                        File file = Utils.join(Repository.CWD, fileTrackedInCurrentCommit);
                         file.delete();
                     }
                     Repository.clearStage();

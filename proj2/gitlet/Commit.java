@@ -53,15 +53,15 @@ public class Commit implements Serializable {
     }
     /** get the file ID of a file, extension included*/
     public String getBlobId(String fileName) {
-        if (!trackedFiles.containsKey(fileName)) {
-            return null;
-        }
-        return trackedFiles.get(fileName);
+//        if (!trackedFiles.containsKey(fileName)) {
+//            return null;
+//        }
+        return trackedFiles.getOrDefault(fileName, "");
     }
     /** get the file that this commit is tracking by the name of the file (extension included)*/
     public File getBlob(String fileName) {
-        String fileId = getBlobId(fileName);
-        return Utils.join(BLOBS, fileId);
+        String blobId = getBlobId(fileName);
+        return Utils.join(BLOBS, blobId);
     }
     public static void exists(String commitId) {
         if (commitId == null) {
@@ -72,7 +72,7 @@ public class Commit implements Serializable {
     }
     public static void exists(File commitFile) {
         if (!commitFile.exists()) {
-            throw new GitletException(String.format("Commit %s not exists", commitFile.toString()));
+            throw new GitletException("No commit with that id exists.");
         }
     }
     /** get the parent 1*/
@@ -91,6 +91,7 @@ public class Commit implements Serializable {
     public static String toFileName(String fileName) {
         return fileName + "." + DATAFILETYPE;
     }
+    /** get the commit from commitId*/
     public static Commit fromCommitId(String commitId) {
         exists(commitId);
         File commitFile = join(COMMITS, toFileName(commitId));
