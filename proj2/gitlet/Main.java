@@ -394,7 +394,9 @@ public class Main {
                 }
                 for (String fileNameInCWD : files) {
                     File file = Utils.join(Repository.CWD, fileNameInCWD);
-                    file.delete();
+                    if (currentCommit.isTracked(fileNameInCWD) && !targetCommit.isTracked(fileNameInCWD)) {
+                        file.delete();
+                    }
                 }
                 Repository.clearStage();
                 HashMap<String, String> filesInTargetCommit = targetCommit.getTrackedFiles();
