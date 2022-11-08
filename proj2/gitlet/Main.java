@@ -394,7 +394,9 @@ public class Main {
                 }
                 for (String fileNameInCWD : files) {
                     File file = Utils.join(Repository.CWD, fileNameInCWD);
-                    file.delete();
+                    if (currentCommit.isTracked(fileNameInCWD) && !targetCommit.isTracked(fileNameInCWD)) {
+                        file.delete();
+                    }
                 }
                 Repository.clearStage();
                 HashMap<String, String> filesInTargetCommit = targetCommit.getTrackedFiles();
@@ -418,8 +420,6 @@ public class Main {
                 // TODO: handle the `init` command
                 // initiallize the repository
                 validateNumArgs("init", args, 1);
-                // TODO: fill the rest for "init" command
-
                 break;
             case "add":
                 // TODO: handle the `add [filename]` command
@@ -427,17 +427,16 @@ public class Main {
                 // only one file may be added at a time.
                 validateNumArgs("add", args, 2);
                 // TODO: fill the rest for "add" command
+                isFile(args[1]);
                 break;
             // TODO: FILL THE REST IN
             case "commit":
                 // Saves a snapshot of tracked files in the current commit and staging area
                 // so they can be restored at a later time, creating a new commit.
                 if (args.length == 1) {
-                    throw new IllegalArgumentException("Please enter a commit message.");
+                    throw new GitletException("Please enter a commit message.");
                     }
                 validateNumArgs("commit", args, 2);
-                // TODO:  fill the rest for "commit" command
-
                 break;
             case "rm":
                 // Unstage the file if it is currently staged for addition.
@@ -445,44 +444,46 @@ public class Main {
                 // stage it for removal and remove the file from
                 // the working directory if the user has not already done so
                 // (do not remove it unless it is tracked in the current commit).
+                if (args.length == 1) {
+                    throw new GitletException("Please enter the file name that you want to remove.");
+                }
                 validateNumArgs("rm", args, 2);
                 // TODO: fill the rest for "rm" command
-
+                isFile(args[1]);
                 break;
             case "log":
                 validateNumArgs("log", args, 1);
-                // TODO: fill the rest for "log" command
-
                 break;
 
             case "global-log":
                 validateNumArgs("global-log", args, 1);
-
                 break;
             case "find":
-
+                validateNumArgs("find", args, 2);
                 break;
             case "status":
-
+                validateNumArgs("status", args, 1);
                 break;
             case "checkout":
-
+                validateNumArgs("checkout", args, 2, 4);
+                if (args.length >= 3) {
+                    isFile(args[args.length - 1]);
+                }
                 break;
             case "branch":
-
+                validateNumArgs("branch", args, 2);
                 break;
             case "rm-branch":
-
+                validateNumArgs("rm-branch", args, 2);
                 break;
             case "reset":
-
+                validateNumArgs("reset", args, 2);
                 break;
             case "merge":
-
+                validateNumArgs("merge", args, 2);
                 break;
             default:
-
-                break;
+                throw new GitletException("Command not found.");
         }
     }
     public static void validateNumArgs(String cmd, String[] args, int lo, int hi) {
@@ -493,6 +494,11 @@ public class Main {
     }
     public static void validateNumArgs(String cmd, String[] args, int lo) {
         validateNumArgs(cmd, args, lo, lo);
+    }
+    public static void isFile(String fileName) {
+        if (!fileName.contains(".")) {
+            throw new GitletException(String.format("%s is not a file", fileName));
+        }
     }
 
 }

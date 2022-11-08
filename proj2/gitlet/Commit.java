@@ -5,6 +5,7 @@ package gitlet;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Date; // TODO: You'll likely use this in this class
 import java.util.HashMap;
 
@@ -123,7 +124,8 @@ public class Commit implements Serializable {
         if(secondParent != null) {
             System.out.printf("Merge: %s, %s\n", firstParent.substring(0, COMMITIDLENGTH), secondParent.substring(0, COMMITIDLENGTH));
         }
-        System.out.printf("Date: %s\n", commitTime.toString());
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM d hh:mm:ss yyyy Z");
+        System.out.printf("Date: %s\n", dateFormat.format(commitTime).toString());
         System.out.printf("%s\n\n", message);
     }
     public static void printCommitById(String commitId) {

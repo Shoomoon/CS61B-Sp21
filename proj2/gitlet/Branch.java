@@ -48,7 +48,7 @@ public class Branch implements Serializable {
         return Commit.fromCommitId(commitId);
     }
     public void setCurrentBranchName(String branchName) throws IOException {
-        if (branchName == null) {
+        if (branchName == null || branchName.isEmpty()) {
             throw new GitletException("Branch name should not be empty.");
         }
         if (!branchToHeadCommits.containsKey(branchName)) {
@@ -63,7 +63,7 @@ public class Branch implements Serializable {
     }
     public void newBranch(String commitId, String branchName) throws IOException {
         Commit.exists(commitId);
-        if (branchName == null) {
+        if (branchName == null || branchName.isEmpty()) {
             throw new GitletException("Branch name should not be empty.");
         }
         if (branchToHeadCommits.containsKey(branchName)) {
