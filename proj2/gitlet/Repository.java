@@ -75,7 +75,7 @@ public class Repository implements Serializable {
         Branch branch = Branch.getBranch();
         Commit commit = new Commit(meg, AUTHOR, new Date(), branch.getCurrentCommitId(), p2, files);
         byte[] content = Utils.serialize(commit);
-        String commitId = Utils.sha1((Object) content);
+        String commitId = Utils.sha1(content);
         File file = Utils.join(COMMITS, Commit.toFileName(commitId));
     }
     public static String toFileName(String name) {
@@ -111,10 +111,10 @@ public class Repository implements Serializable {
         isFile(file);
         if (!file.exists()) { return "";}
         byte[] contents = Utils.readContents(file);
-        return Utils.sha1((Object) contents, "file", getExtension(file));
+        return Utils.sha1(contents, "file", getExtension(file));
     }
     /** get the file name in BLOBS: fileHashValue.ex*/
-    public static String getBlobName(File file) {
+    public static String getBlobId(File file) {
         isFile(file);
         String fileName = file.getName();
         String blobId = getFileHashVal(file);
@@ -122,7 +122,7 @@ public class Repository implements Serializable {
         return blobId + fileName.substring(dot);
     }
     public static void saveFileToBlob(File file) throws IOException {
-        String blobName = getBlobName(file);
+        String blobName = getBlobId(file);
         File blobFile = join(BLOBS, blobName);
         if (blobFile.exists()) {
             copyFile(file, blobFile);
@@ -139,20 +139,20 @@ public class Repository implements Serializable {
     }
     public static void isFile(File file) {
         if (!file.isFile()) {
-            throw new GitletException(String.format("File %s is not a file.", file.toString()));
+            throw new GitletException(String.format("File %s is not a file.", file));
         }
     }
     public static void isDirectory(File file) {
         if (!file.isDirectory()) {
-            throw new GitletException(String.format("File %s is not a directory.", file.toString()));
+            throw new GitletException(String.format("File %s is not a directory.", file));
         }
     }
     public static void copyFile(File source, File target) throws IOException {
         creatFileIfNotExist(target);
         byte[] content = readContents(source);
-        writeContents(target, (Object) content);
+        writeContents(target, content);
     }
-    public static HashSet<String> getRemovedFilesList() throws IOException {
+    public static HashSet<String> getRemovedFilesSet() throws IOException {
         return readObject(STAGEREMOVEFILES, HashSet.class);
     }
     public static void saveRemovedFilesList(HashSet<String> removedFilesList) throws IOException {
@@ -165,5 +165,25 @@ public class Repository implements Serializable {
         }
         creatFileIfNotExist(STAGEREMOVEFILES);
         writeObject(STAGEREMOVEFILES, new HashSet<String>());
+    }
+    public static File getBlob(String blobId) {
+        return Utils.join(BLOBS, blobId);
+    }
+    public static byte[] getBlobContent(String blobId) {
+        if (blobId.isEmpty()) {
+            return new byte[0];
+        } else {
+            return Utils.readContents(getBlob(blobId));
+        }
+    }
+    // merge two contents in current blob and given blob into targetFile
+    public static void mergeToFile(String currentBlobId, String givenBlobId, File targetFile) throws IOException {
+        if (targetFile.isFile()) {
+            throw new GitletException(String.format("%s is not a file", targetFile));
+        }
+        if (!targetFile.exists()) {
+            targetFile.createNewFile();
+        }
+        writeObject(targetFile, new Object[] {"<<<<<<< HEAD\n", getBlobContent(currentBlobId), "=======\n", getBlobContent(givenBlobId)});
     }
 }

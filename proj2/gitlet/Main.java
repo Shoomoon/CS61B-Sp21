@@ -14,7 +14,7 @@ public class Main {
      */
     public static void main(String[] args) throws GitletException, IOException {
         // TODO: what if args is empty?
-        if (args == null) {
+        if (args == null || args.length == 0) {
             throw new IllegalArgumentException("Please enter a command.");
         }
         String firstArg = args[0];
@@ -43,9 +43,9 @@ public class Main {
                 // TODO: fill the rest for "add" command
                 /** 2. "add": store a copy of a file into STAGE directory, O(N + logN)
                  * 2.1. read in current contents of the file and calculate the hash value, if not exist, throw error.
-                 * 2.2. compare to current commit version, if same with current commit version, don't stage, and remove if exists in STAGE
-                 * 2.3. remove previous copy in STAGE of same file if in STAGE;
-                 * 2.4. write in a new file in STAGE. */
+                 * 2.2. compare to current commit version, if same with current commit version, don't stage, and remove if exists in STAGEADD
+                 * 2.3. otherwise, copy the file into STAGEADD;
+                 * 2.4. if the file has been staged to remove, remove it from removedFileList */
                 String fileName = args[1];
                 File fileToAdd = new File(Repository.CWD, fileName);
                 if (!fileToAdd.exists()) {
@@ -61,6 +61,12 @@ public class Main {
                     }
                 } else {
                     Repository.copyFile(fileToAdd, stagedFile);
+                }
+                //
+                HashSet<String> removedFilesSet = Repository.getRemovedFilesSet();
+                if (removedFilesSet.contains(fileName)) {
+                    removedFilesSet.remove(fileName);
+                    Repository.saveRemovedFilesList(removedFilesSet);
                 }
                 break;
             // TODO: FILL THE REST IN
@@ -78,7 +84,11 @@ public class Main {
                  * */
                 Boolean addedOrRemoved = false;
                 File[] filesInStageAdd = Repository.STAGEADD.listFiles();
-                HashSet<String> filesInStageRemove = Repository.getRemovedFilesList();
+                HashSet<String> filesInStageRemove = Repository.getRemovedFilesSet();
+                String secondParentCommitId = "";
+                if (args.length == 3) {
+                    secondParentCommitId = args[2];
+                }
                 if (filesInStageAdd == null && filesInStageRemove == null) {
                     throw new GitletException("No changes added to the commit.");
                 }
@@ -91,9 +101,9 @@ public class Main {
                 HashMap<String, String> trackedFiles = currentCommit.getTrackedFiles();
                 for (File file: filesInStageAdd) {
                     String file_name = file.getName();
-                    String blobName = Repository.getBlobName(file);
-                    trackedFiles.put(file_name, blobName);
-                    File blobFile = Utils.join(Repository.BLOBS, blobName);
+                    blobId = Repository.getBlobId(file);
+                    trackedFiles.put(file_name, blobId);
+                    File blobFile = Utils.join(Repository.BLOBS, blobId);
                     if (!blobFile.exists()) {
                         Repository.copyFile(file, blobFile);
                     }
@@ -106,7 +116,7 @@ public class Main {
                 if (!addedOrRemoved) {
                     throw new GitletException("No changes added to the commit.");
                 }
-                branch.addCommitToCurrentBranch(message, Repository.AUTHOR, null, trackedFiles);
+                branch.addCommitToCurrentBranch(message, Repository.AUTHOR, secondParentCommitId, trackedFiles);
                 Repository.clearStage();
                 break;
             case "rm":
@@ -135,7 +145,7 @@ public class Main {
                 if (currentCommit.isTracked(fileName)) {
                     stagedOrTracked = true;
                     /** stage for removal*/
-                    HashSet<String> removedFiles = Repository.getRemovedFilesList();
+                    HashSet<String> removedFiles = Repository.getRemovedFilesSet();
                     removedFiles.add(fileName);
                     Repository.saveRemovedFilesList(removedFiles);
                     /** remove the file from CWD*/
@@ -217,7 +227,7 @@ public class Main {
                 currentCommit = branch.getCurrentCommit();
                 /** print branches names*/
                 System.out.printf("=== Branches ===\n");
-                ArrayList<String> branchNames = branch.getAllBranchNames();
+                List<String> branchNames = branch.getAllBranchNames();
                 Collections.sort(branchNames);
                 String currentBranchName = branch.getCurrentBranchName();
                 for (String branchName: branchNames) {
@@ -226,7 +236,6 @@ public class Main {
                     }
                     System.out.printf("%s\n", branchName);
                 }
-                System.out.print("\n");
                 /** print files in Stage add directory */
                 System.out.printf("\n=== Staged Files ===\n");
                 List<String> addedFiles = Utils.plainFilenamesIn(Repository.STAGEADD);
@@ -235,8 +244,8 @@ public class Main {
                 }
                 /** print removed files */
                 System.out.print("\n=== Removed Files ===\n");
-                HashSet<String> removedFilesSet = Repository.getRemovedFilesList();
-                ArrayList<String> removedFiles = new ArrayList<>(removedFilesSet);
+                removedFilesSet = Repository.getRemovedFilesSet();
+                List<String> removedFiles = new ArrayList<>(removedFilesSet);
                 Collections.sort(removedFiles);
                 for (String removedFileName: removedFiles) {
                     System.out.printf("%s\n", removedFileName);
@@ -408,7 +417,69 @@ public class Main {
                 branch.forwardCurrentBranchTo(commitId);
                 break;
             case "merge":
-
+                List<String> filesListInStageAdd = Utils.plainFilenamesIn(Repository.CWD);
+                filesInStageRemove = Repository.getRemovedFilesSet();
+                if ((filesListInStageAdd == null || filesListInStageAdd.isEmpty()) && filesInStageRemove.isEmpty()) {
+                    throw new GitletException("You have uncommitted changes.");
+                }
+                branch = Branch.getBranch();
+                if (!branch.containBranch(args[1])) {
+                    throw new GitletException("A branch with that name does not exist.");
+                }
+                if (args[1].equals(branch.currentBranchName())) {
+                    throw new GitletException("Cannot merge a branch with itself.");
+                }
+                currentCommitId = branch.getCurrentCommitId();
+                String givenCommitId = branch.getBranchHeadCommitId(args[1]);
+                String latestCommonAncestorCommitId = Commit.lastestCommonAncestorCommitId(currentCommitId, givenCommitId);
+                if (latestCommonAncestorCommitId.equals(givenCommitId)) {
+                    throw new GitletException("Given branch is an ancestor of the current branch.");
+                }
+                Commit lastestCommonAncestorCommit = Commit.fromCommitId(latestCommonAncestorCommitId);
+                currentCommit = Commit.fromCommitId(currentCommitId);
+                Commit givenCommit = Commit.fromCommitId(givenCommitId);
+                HashMap<String, String> trackedFilesInGivenCommit = givenCommit.getTrackedFiles();
+                for (String file: trackedFilesInGivenCommit.keySet()) {
+                    File fileInCWD = Utils.join(Repository.CWD, file);
+                    if (fileInCWD.exists() && !currentCommit.isTracked(file) && !Repository.sameWithBlob(fileInCWD, givenCommit.getBlobId(file))) {
+                        throw new GitletException("There is an untracked file in the way; delete it, or add and commit it first.");
+                    }
+                }
+                if (latestCommonAncestorCommitId.equals(currentCommitId)) {
+                    main(new String[]{"checkout", args[1]});
+                    throw new GitletException("Current branch fast-forwarded.");
+                }
+                for (String file: trackedFilesInGivenCommit.keySet()) {
+                    File fileInCWD = Utils.join(Repository.CWD, file);
+                    File fileInStagedAdd = Utils.join(Repository.STAGEADD, file);
+                    String blobIdInCurrentCommit = currentCommit.getBlobId(file);
+                    String blobIdInGivenCommit = givenCommit.getBlobId(file);
+                    String blobIdInLCACommit = lastestCommonAncestorCommit.getBlobId(file);
+                    if (blobIdInCurrentCommit.equals(blobIdInLCACommit) && !blobIdInGivenCommit.equals(blobIdInCurrentCommit)) {
+                        fileInStagedAdd.createNewFile();
+                        Repository.copyFile(Repository.getBlob(blobIdInGivenCommit), fileInCWD);  //checkout
+                        Repository.copyFile(Repository.getBlob(blobIdInGivenCommit), fileInStagedAdd);  //stage add
+                    } else if (!blobIdInCurrentCommit.isEmpty() && !blobIdInCurrentCommit.equals(blobIdInLCACommit) && blobIdInGivenCommit.equals(blobIdInLCACommit)) {
+                        trackedFilesInGivenCommit.put(file, blobIdInCurrentCommit);
+                    } else if (!blobIdInCurrentCommit.equals(blobIdInLCACommit) && !blobIdInCurrentCommit.equals(blobIdInGivenCommit) && !blobIdInGivenCommit.equals(blobIdInLCACommit)) {
+                        // merge
+                        Repository.mergeToFile(blobIdInCurrentCommit, blobIdInGivenCommit, fileInCWD);
+                        // stage add
+                        Repository.copyFile(fileInCWD, fileInStagedAdd);
+                    } else if (blobIdInCurrentCommit.isEmpty() && blobIdInGivenCommit.equals(blobIdInLCACommit)) {
+                        trackedFilesInGivenCommit.remove(file);
+                    }
+                }
+                for (String file: currentCommit.getTrackedFiles().keySet()) {
+                    File fileInCWD = Utils.join(Repository.CWD, file);
+                    String blobIdInCurrentCommit = currentCommit.getBlobId(file);
+                    String blobIdInGivenCommit = givenCommit.getBlobId(file);
+                    String blobIdInLCACommit = lastestCommonAncestorCommit.getBlobId(file);
+                    if (blobIdInGivenCommit.isEmpty() && blobIdInCurrentCommit.equals(blobIdInLCACommit)) {
+                        fileInCWD.delete();
+                    }
+                }
+                main(new String[] {"commit", String.format("Merged %s into %s.", args[1], branch.getCurrentBranchName(), givenCommitId)});
                 break;
             default:
                 throw new IllegalArgumentException("No command with that name exists.");
@@ -436,7 +507,7 @@ public class Main {
                 if (args.length == 1) {
                     throw new GitletException("Please enter a commit message.");
                     }
-                validateNumArgs("commit", args, 2);
+                validateNumArgs("commit", args, 2, 3);
                 break;
             case "rm":
                 // Unstage the file if it is currently staged for addition.

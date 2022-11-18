@@ -55,7 +55,7 @@ public class Commit implements Serializable {
     /** get the file ID of a file, extension included*/
     public String getBlobId(String fileName) {
 //        if (!trackedFiles.containsKey(fileName)) {
-//            return null;
+//            return "";
 //        }
         return trackedFiles.getOrDefault(fileName, "");
     }
@@ -121,7 +121,7 @@ public class Commit implements Serializable {
     public void printCommit(String commitId) {
         System.out.print("===\n");
         System.out.printf("commit %s\n", commitId);
-        if(secondParent != null) {
+        if(secondParent != null && !secondParent.isEmpty()) {
             System.out.printf("Merge: %s, %s\n", firstParent.substring(0, COMMITIDLENGTH), secondParent.substring(0, COMMITIDLENGTH));
         }
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM d hh:mm:ss yyyy Z");
@@ -134,5 +134,22 @@ public class Commit implements Serializable {
     }
     public boolean isTracked(String fileNameWithEx) {
         return fileNameWithEx != null && trackedFiles.containsKey(fileNameWithEx);
+    }
+    public static String lastestCommonAncestorCommitId(String commitId0, String commitId1) {
+        String commitId0_init = commitId0;
+        String commitId1_init = commitId1;
+        while (!commitId0.equals(commitId1)) {
+            Commit commit0 = fromCommitId(commitId0);
+            commitId0 = commit0.getFirstParent();
+            if (commitId0.isEmpty()) {
+                commitId0 = commitId1_init;
+            }
+            Commit commit1 = fromCommitId(commitId1);
+            commitId1 = commit1.getFirstParent();
+            if (commitId1.isEmpty()) {
+                commitId1 = commitId0_init;
+            }
+        }
+        return commitId0;
     }
 }

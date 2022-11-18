@@ -47,6 +47,9 @@ public class Branch implements Serializable {
         String commitId = branchToHeadCommits.get(branchName);
         return Commit.fromCommitId(commitId);
     }
+    public String getBranchHeadCommitId(String branchName) {
+        return branchToHeadCommits.get(branchName);
+    }
     public void setCurrentBranchName(String branchName) throws IOException {
         if (branchName == null || branchName.isEmpty()) {
             throw new GitletException("Branch name should not be empty.");
