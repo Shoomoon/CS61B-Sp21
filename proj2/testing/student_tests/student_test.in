@@ -1,0 +1,38 @@
+# by Xiaoming Qiu
+I definitions.inc
+> init
+<<<
+E .gitlet
++ wug.txt wug.txt
+> add wug.txt
+<<<
+> commit "add wug.txt"
+<<<
+> rm wug.txt
+<<<
+* wug.txt
++ wug.txt wag.txt
+> checkout -- wug.txt
+<<<
+= wug.txt wug.txt
+# Each ${COMMIT_HEAD} captures its commit UID.
+> log
+===
+${COMMIT_HEAD}
+add wug.txt
+
+===
+${COMMIT_HEAD}
+initial commit
+
+<<<*
++ wug.txt wag.txt
+> add wug.txt
+<<<
+> commit "modify wug.txt as wag.txt"
+<<<
+= wug.txt wag.txt
+> find txt
+${COMMIT_ID}
+${COMMIT_ID}
+<<<*
