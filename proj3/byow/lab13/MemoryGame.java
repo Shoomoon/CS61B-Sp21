@@ -1,7 +1,7 @@
 package byow.lab13;
 
 import byow.Core.RandomUtils;
-import edu.princeton.cs.introcs.StdDraw;
+import edu.princeton.cs.algs4.StdDraw;
 
 import java.awt.Color;
 import java.awt.Font;
