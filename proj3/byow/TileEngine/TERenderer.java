@@ -1,6 +1,6 @@
 package byow.TileEngine;
 
-import edu.princeton.cs.algs4.StdDraw;
+import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -95,6 +95,7 @@ public class TERenderer {
                 }
                 world[x][y].draw(x + xOffset, y + yOffset);
             }
+            StdDraw.show();
         }
         StdDraw.show();
     }

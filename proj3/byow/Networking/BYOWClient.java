@@ -1,6 +1,6 @@
 package byow.Networking;
 
-import edu.princeton.cs.algs4.StdDraw;
+import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.*;
 import java.io.*;
