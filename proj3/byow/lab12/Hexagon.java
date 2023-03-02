@@ -4,9 +4,8 @@ import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
 
 public class Hexagon {
-    private TETile pattern = Tileset.NOTHING;
-    private int hexagonSize = 3;
-    public static final TETile VOIDTETILE = Tileset.FLOWER;
+    private final TETile pattern;
+    private final int hexagonSize;
     public static final int PATTERNS = 5;
     public Hexagon(int size, TETile TETilePattern) {
         this.hexagonSize = size;
@@ -37,11 +36,5 @@ public class Hexagon {
                 teTileWorld[x][y] = this.pattern;
             }
         }
-    }
-    public int getXBias() {
-        return this.hexagonSize - 1;
-    }
-    public int getYBias() {
-        return 0;
     }
 }

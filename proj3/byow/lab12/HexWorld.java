@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  */
 public class HexWorld {
     // number of Hexagons on each side of HexWorld
-    private static final int SIZE = 4;
+    private static final int SIZE = 3;
     // number of Tiles on each side of Hexagon
     private static int hexagonSize = 3;
     // Random generator
@@ -159,5 +159,8 @@ public class HexWorld {
     public static int getHexagonX(int i, int j) {
         // bias is hexagonSize - 1, and the distance between adjacent columns is 2 * hexagonSize - 1
         return hexagonSize - 1 + i * getColumnDistance();
+    }
+    public static int getHexagonSize() {
+        return hexagonSize;
     }
 }
