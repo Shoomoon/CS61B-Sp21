@@ -32,12 +32,12 @@ public class HexWorld {
         setHexagonSize(nums[0]);
         setRandom(nums[1]);
 
+        // random generate hexagons
+        Hexagon[][] world = randomGenerateHexagonWorld();
+
         // initialize the tile rendering engine
         TERenderer ter = new TERenderer();
         initialize(ter);
-
-        // random generate hexagons
-        Hexagon[][] world = randomGenerateHexagonWorld();
 
         // draws the world to the screen
         renderHexWorld(ter, world);
