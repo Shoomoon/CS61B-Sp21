@@ -79,11 +79,11 @@ public class Branch implements Serializable {
         newBranch(getCurrentCommitId(), branchName);
     }
     public void addCommitToCurrentBranch(String meg, String author, String p2, HashMap<String, String> files) throws IOException {
-        Commit commit = new Commit(meg, author, new Date(), getCurrentCommitId(), p2, files);
-        String commitId = commit.saveCommit();
         if (currentBranchName == null || currentBranchName.equals("")) {
             throw new GitletException("Add a new branch to current commit.");
         }
+        Commit commit = new Commit(meg, author, new Date(), getCurrentCommitId(), p2, files);
+        String commitId = commit.saveCommit();
         branchToHeadCommits.put(currentBranchName, commitId);
         saveBranch();
     }

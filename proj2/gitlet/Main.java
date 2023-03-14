@@ -312,21 +312,25 @@ public class Main {
                     }
                     File commitFile = Utils.join(Commit.COMMITS, Commit.toFileName(commitId));
                     if (!commitFile.exists()) {
-                        throw new GitletException("No commit with that id exists.");
+                        System.out.print("No commit with that id exists.");
+                        break;
                     }
                     Commit commit = Commit.fromFile(commitFile);
                     if (!commit.isTracked(fileName)) {
-                        throw new GitletException("File does not exist in that commit.");
+                        System.out.print("File does not exist in that commit.");
+                        break;
                     }
                     File blob = commit.getBlob(fileName);
                     Repository.copyFile(blob, Utils.join(Repository.CWD, fileName));
                 } else {
                     String branchName = args[1];
                     if (!branch.containBranch(branchName)) {
-                        throw new GitletException("No such branch exists.");
+                        System.out.print("No such branch exists.");
+                        break;
                     }
                     if (branchName.equals(branch.getCurrentBranchName())) {
-                        throw new GitletException("No need to checkout the current branch.");
+                        System.out.print("No need to checkout the current branch.");
+                        break;
                     }
                     currentCommit = branch.getCurrentCommit();
                     Commit targetCommit = branch.getBranchHeadCommit(branchName);
@@ -420,35 +424,47 @@ public class Main {
                 List<String> filesListInStageAdd = Utils.plainFilenamesIn(Repository.CWD);
                 filesInStageRemove = Repository.getRemovedFilesSet();
                 if ((filesListInStageAdd == null || filesListInStageAdd.isEmpty()) && filesInStageRemove.isEmpty()) {
-                    throw new GitletException("You have uncommitted changes.");
+                    System.out.print("You have uncommitted changes.");
+                    break;
                 }
                 branch = Branch.getBranch();
                 if (!branch.containBranch(args[1])) {
-                    throw new GitletException("A branch with that name does not exist.");
+                    System.out.print("A branch with that name does not exist.");
+                    break;
                 }
                 if (args[1].equals(branch.currentBranchName())) {
-                    throw new GitletException("Cannot merge a branch with itself.");
+                    System.out.print("Cannot merge a branch with itself.");
+                    break;
                 }
                 currentCommitId = branch.getCurrentCommitId();
                 String givenCommitId = branch.getBranchHeadCommitId(args[1]);
                 String latestCommonAncestorCommitId = Commit.lastestCommonAncestorCommitId(currentCommitId, givenCommitId);
                 if (latestCommonAncestorCommitId.equals(givenCommitId)) {
-                    throw new GitletException("Given branch is an ancestor of the current branch.");
+                    System.out.print("Given branch is an ancestor of the current branch.");
+                    break;
                 }
                 Commit lastestCommonAncestorCommit = Commit.fromCommitId(latestCommonAncestorCommitId);
                 currentCommit = Commit.fromCommitId(currentCommitId);
                 Commit givenCommit = Commit.fromCommitId(givenCommitId);
                 HashMap<String, String> trackedFilesInGivenCommit = givenCommit.getTrackedFiles();
+                boolean unTrackedFileExist = false;
                 for (String file: trackedFilesInGivenCommit.keySet()) {
                     File fileInCWD = Utils.join(Repository.CWD, file);
                     if (fileInCWD.exists() && !currentCommit.isTracked(file) && !Repository.sameWithBlob(fileInCWD, givenCommit.getBlobId(file))) {
-                        throw new GitletException("There is an untracked file in the way; delete it, or add and commit it first.");
+                        System.out.print("There is an untracked file in the way; delete it, or add and commit it first.");
+                        unTrackedFileExist = true;
+                        break;
                     }
+                }
+                if (unTrackedFileExist) {
+                    break;
                 }
                 if (latestCommonAncestorCommitId.equals(currentCommitId)) {
                     main(new String[]{"checkout", args[1]});
-                    throw new GitletException("Current branch fast-forwarded.");
+                    System.out.print("Current branch fast-forwarded.");
+                    break;
                 }
+                boolean conflicted = false;
                 for (String file: trackedFilesInGivenCommit.keySet()) {
                     File fileInCWD = Utils.join(Repository.CWD, file);
                     File fileInStagedAdd = Utils.join(Repository.STAGEADD, file);
@@ -466,10 +482,12 @@ public class Main {
                         Repository.mergeToFile(blobIdInCurrentCommit, blobIdInGivenCommit, fileInCWD);
                         // stage add
                         Repository.copyFile(fileInCWD, fileInStagedAdd);
+                        conflicted = true;
                     } else if (blobIdInCurrentCommit.isEmpty() && blobIdInGivenCommit.equals(blobIdInLCACommit)) {
                         trackedFilesInGivenCommit.remove(file);
                     }
                 }
+                System.out.print("CheckPoint_0\n");
                 for (String file: currentCommit.getTrackedFiles().keySet()) {
                     File fileInCWD = Utils.join(Repository.CWD, file);
                     String blobIdInCurrentCommit = currentCommit.getBlobId(file);
@@ -479,7 +497,11 @@ public class Main {
                         fileInCWD.delete();
                     }
                 }
-                main(new String[] {"commit", String.format("Merged %s into %s.", args[1], branch.getCurrentBranchName(), givenCommitId)});
+                System.out.print("CheckPoint_1\n");
+                main(new String[] {"commit", String.format("Merged %s into %s.", args[1], branch.getCurrentBranchName()), givenCommitId});
+                if (conflicted) {
+                    System.out.print("Encountered a merge conflict.");
+                }
                 break;
             default:
                 throw new IllegalArgumentException("No command with that name exists.");

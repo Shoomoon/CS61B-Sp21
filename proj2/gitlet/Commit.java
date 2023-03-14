@@ -122,7 +122,7 @@ public class Commit implements Serializable {
         System.out.print("===\n");
         System.out.printf("commit %s\n", commitId);
         if(secondParent != null && !secondParent.isEmpty()) {
-            System.out.printf("Merge: %s, %s\n", firstParent.substring(0, COMMITIDLENGTH), secondParent.substring(0, COMMITIDLENGTH));
+            System.out.printf("Merge: %s %s\n", firstParent.substring(0, COMMITIDLENGTH), secondParent.substring(0, COMMITIDLENGTH));
         }
         SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM d hh:mm:ss yyyy Z");
         System.out.printf("Date: %s\n", dateFormat.format(commitTime).toString());
@@ -141,12 +141,12 @@ public class Commit implements Serializable {
         while (!commitId0.equals(commitId1)) {
             Commit commit0 = fromCommitId(commitId0);
             commitId0 = commit0.getFirstParent();
-            if (commitId0.isEmpty()) {
+            if (commitId0 == null || commitId0.isEmpty()) {
                 commitId0 = commitId1_init;
             }
             Commit commit1 = fromCommitId(commitId1);
             commitId1 = commit1.getFirstParent();
-            if (commitId1.isEmpty()) {
+            if (commitId1 == null || commitId1.isEmpty()) {
                 commitId1 = commitId0_init;
             }
         }
