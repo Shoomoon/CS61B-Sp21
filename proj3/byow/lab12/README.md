@@ -10,7 +10,8 @@ The size of HexWorld, which means
 how many Hexagons in each side of the Hexagon-shaped world map. 
 
 2. <u>***private static int hexagonSize = 3***</u>: The size of Hexagon, which indicates
-that how many tiles on each side of the Hexagon.3. <u>***private static Random RANDOM***</u>: The pseudorandom number generator generate
+that how many tiles on each side of the Hexagon.
+3. <u>***private static Random RANDOM***</u>: The pseudorandom number generator generate
 a pseudorandom number based on the random seed.
 ***
 ## Hexagon

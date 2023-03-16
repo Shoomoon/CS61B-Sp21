@@ -15,7 +15,8 @@ public class Engine {
     /* Feel free to change the width and height. */
     public static final int WIDTH = 80;
     public static final int HEIGHT = 60;
-    public static final double ROOMPROBABILITY = 0.2;
+    public static final double ROOMPROBABILITY = 0.01;
+    public static final double RANDOMSELECTROOMPROBABILITY = 0.1;
     public static final int MINROOMWIDTH = 3;
     public static final int MAXROOMWIDTH = 10;
     public static final int MINROOMHEIGHT = 3;
@@ -25,7 +26,6 @@ public class Engine {
 
 
     public static void main(String[] args) {
-        int seed = argsValidate(args[0]);
         Engine engine = new Engine();
         TETile[][] tiles = engine.interactWithInputString(args[0]);
         engine.renderFrame(tiles);
@@ -69,6 +69,9 @@ public class Engine {
         // if there is no other room, or the room is overlapped with any room, return null
         if (rooms == null || rooms.isEmpty()) {
             return null;
+        }
+        if (random.nextDouble() < RANDOMSELECTROOMPROBABILITY) {
+            return rooms.get(RandomUtils.uniform(random, rooms.size()));
         }
         Room nearestRoom = rooms.get(0);
         int count = 0;

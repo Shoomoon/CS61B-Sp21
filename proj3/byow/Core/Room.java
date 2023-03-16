@@ -43,18 +43,18 @@ public class Room {
         }
     }
     public int distance(Room r) {
-        int w = Math.min(x + width - 1, r.x + r.width - 1) - Math.max(x, r.x);
-        int h = Math.min(y + height - 1, r.y + r.height - 1) - Math.max(y, r.y);
+        int w = Math.min(x + width, r.x + r.width) - Math.max(x, r.x);
+        int h = Math.min(y + height, r.y + r.height) - Math.max(y, r.y);
         // if overlap or adjacent to each other, just return -1
-        if ((w >= -1 && h > -1) || (w > -1 && h == -1)) {
+        if ((w >= 0 && h > 0) || (w > 0 && h == 0)) {
             return -1;
         }
         // if only overlap along x-axis
-        if (w >= 0) {
+        if (w > 0) {
             return -h;
         }
         // if only overlap along y-axis
-        if (h >= 0)
+        if (h > 0)
             return -w;
         return -w - h;
     }
@@ -65,28 +65,28 @@ public class Room {
         // if r is on the top side of this room, connect this room.left side with r.bottom side by |_ shape hallway
         // if r is on the bottom side of this room, connect this room.left side with r.top side by |- shape hallway
         // otherwise connect this room.
-        int wr = Math.min(x + width - 1, r.x + r.width - 1);
+        int wr = Math.min(x + width, r.x + r.width);
         int wl = Math.max(x, r.x);
-        int ht = Math.min(y + height - 1, r.y + r.height - 1);
+        int ht = Math.min(y + height, r.y + r.height);
         int hb = Math.max(y, r.y);
-        // if this 2 room have overlap, don't need to use hallway to connect with each other
-        if (wr - wl >= -1 && ht - hb > -1 || wr - wl > -1 && ht - hb == -1) {
+        // if this 2 room have overlap or adjacent to each other, don't need to use hallway to connect with each other
+        if (wr - wl >= 0 && ht - hb > 0 || wr - wl > 0 && ht - hb == 0) {
 //            System.out.print("These two rooms have overlap, don't need to build up hallway to connect with each other.");
             return;
         }
         // if only have overlap alone x-axis, then use a vertical hallway to connect with each other
-        if (wr >= wl) {
-            int i = RandomUtils.uniform(random, wl, wr + 1);
-            int w = RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1);
-            Room hallway = new Room(i, ht + 1, w, hb - ht - 1);
+        if (wr > wl) {
+            int i = RandomUtils.uniform(random, wl, wr);
+            int w = Math.min(Engine.WIDTH - i - 1, RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1));
+            Room hallway = new Room(i, ht, w, hb - ht);
             hallway.drawRoom(tiles);
             return;
         }
         // if only have overlap alone y-axis, then use a horizontal hallway to connect with each other
-        if (ht >= hb) {
-            int j = RandomUtils.uniform(random, hb, ht + 1);
-            int h = RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1);
-            Room hallway = new Room(wr + 1, j, wl - wr - 1, h);
+        if (ht > hb) {
+            int j = RandomUtils.uniform(random, hb, ht);
+            int h = Math.min(Engine.HEIGHT - j - 1, RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1));
+            Room hallway = new Room(wr, j, wl - wr, h);
             hallway.drawRoom(tiles);
             return;
         }
@@ -96,8 +96,8 @@ public class Room {
         int heightHorHallway = x - xHorHallway;
         int yVerHallway = Math.min(r.y + r.height, yHorHallway);
         int heightVerHallway = Math.max(yHorHallway - yVerHallway, r.y - yHorHallway);
-        Room hallwayHorizontal = new Room(xHorHallway, yHorHallway, heightHorHallway, hallwayWidth);
-        Room hallwayVertical = new Room(xHorHallway, yVerHallway, hallwayWidth, heightVerHallway);
+        Room hallwayHorizontal = new Room(xHorHallway, yHorHallway, heightHorHallway, Math.min(Engine.HEIGHT - yHorHallway - 1, hallwayWidth));
+        Room hallwayVertical = new Room(xHorHallway, yVerHallway, Math.min(Engine.WIDTH - xHorHallway - 1, hallwayWidth), heightVerHallway);
         hallwayHorizontal.drawRoom(tiles);
         hallwayVertical.drawRoom(tiles);
     }

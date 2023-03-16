@@ -1,15 +1,23 @@
 package byow.Core;
 
+import edu.princeton.cs.introcs.StdDraw;
 import org.junit.Test;
+
+import java.awt.*;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class EngineTest {
     @Test
     public void resultTest() {
-        String arg0 = "N347231S";
-        Engine engine = new Engine();
-        engine.main(new String[] {arg0});
+        Random rand = new Random(453151489);
+        for (int i = 0; i < 100; i++) {
+            String arg = "N" + rand.nextInt(475754) + "S";
+            Engine.main(new String[] {arg});
+            StdDraw.pause(1000);
+            StdDraw.clear(Color.BLACK);
+        }
     }
     @Test
     public void argValidateTest() {
@@ -17,10 +25,11 @@ public class EngineTest {
         assertEquals(Engine.argsValidate(arg0), 347231);
         String arg1 = "N3428941S";
         assertEquals(Engine.argsValidate(arg1), 3428941);
-        String messageLength = "Input argument should only be 1 string";
+        String messageLength = "Input argument should not be empty.";
         String messagePattern = "Input argument should be N/n + digits + S/s pattern， for example N12335S, n5785S.";
         try {
-            Engine.argsValidate(null);
+            String arg = null;
+            Engine.argsValidate(arg);
             fail();
         } catch (IllegalArgumentException ex) {
             assertEquals(messageLength, ex.getMessage());
@@ -31,7 +40,7 @@ public class EngineTest {
             Engine.argsValidate(arg3);
             fail();
         } catch (IllegalArgumentException ex) {
-            assertEquals(messagePattern, ex.getMessage());
+            assertEquals(messageLength, ex.getMessage());
         }
 
         try {
