@@ -103,8 +103,12 @@ public class HexWorld {
         Hexagon[][] w = new Hexagon[width][height];
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                int hexagonNum = RANDOM.nextInt(Hexagon.PATTERNS);
-                w[x][y] = new Hexagon(hexagonSize, hexagonNum);
+                if (hexWorldCoordinateValidation(x, y)) {
+                    int hexagonNum = RANDOM.nextInt(Hexagon.PATTERNS);
+                    w[x][y] = new Hexagon(hexagonSize, hexagonNum);
+                } else {
+                    w[x][y] = null;
+                }
             }
         }
         return w;
@@ -122,7 +126,7 @@ public class HexWorld {
         // if the position has a Hexagon, then draw the Hexagon onto TETileWorld
         for (int i = 0; i < world.length; i++) {
             for (int j = 0; j < world[0].length; j++) {
-                if (hexWorldCoordinateValidation(i, j)) {
+                if (world[i][j] != null) {
                     int x = getHexagonX(i, j);
                     int y = getHexagonY(i, j);
                     world[i][j].drawHexagon(TETileWorld, x, y);
