@@ -25,19 +25,19 @@ public class Room {
         }
         //draw horizontal walls
         for (int dx = -1; dx <= width; dx++) {
-            if (tiles[x + dx][y - 1].equals(Tileset.NOTHING)) {
+            if (tiles[x + dx][y - 1].equal(Tileset.NOTHING)) {
                 tiles[x + dx][y - 1] = Tileset.WALL;
             }
-            if (tiles[x + dx][y + height].equals(Tileset.NOTHING)) {
+            if (tiles[x + dx][y + height].equal(Tileset.NOTHING)) {
                 tiles[x + dx][y + height] = Tileset.WALL;
             }
         }
         // draw vertical walls
         for (int dy = 0; dy < height; dy++) {
-            if (tiles[x  - 1][y + dy].equals(Tileset.NOTHING)) {
+            if (tiles[x  - 1][y + dy].equal(Tileset.NOTHING)) {
                 tiles[x  - 1][y + dy] = Tileset.WALL;
             }
-            if (tiles[x + width][y + dy].equals(Tileset.NOTHING)) {
+            if (tiles[x + width][y + dy].equal(Tileset.NOTHING)) {
                 tiles[x + width][y + dy] = Tileset.WALL;
             }
         }
