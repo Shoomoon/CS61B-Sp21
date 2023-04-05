@@ -30,6 +30,36 @@ public class EngineTest {
         StdDraw.clear(Color.BLACK);
     }
     @Test
+    public void showTest() {
+        engine.fillTileWorldWithNothing(world);
+        engine.ter.initialize(Engine.WIDTH, Engine.HEIGHT);
+        StdDraw.setFont(Engine.MESSAGEFONT);
+        StdDraw.setPenColor(Color.WHITE);
+        StdDraw.text(Engine.WIDTH / 2, Engine.HEIGHT / 2, "Hello World!");
+        StdDraw.show(1000);
+        StdDraw.pause(1000);
+        StdDraw.text(Engine.WIDTH / 2, Engine.HEIGHT / 2 + 8, "Hello World!");
+        StdDraw.show();
+    }
+    @Test
+    public void messageTest(){
+        // first make engine.printMessage public
+        // change engine.printMessage to private at the end
+        String arg = "N543SWWWWAA";
+        engine.main(new String[] {arg});
+//        engine.drawMessage("Hello World", 2000);
+        engine.clearMessage();
+        StdDraw.pause(2000);
+//        engine.drawMessage("&&&", 2000);
+        engine.clearMessage();
+        StdDraw.pause(2000);
+    }
+    @Test
+    public void livesDrawTest() {
+        String arg = "N543SWWWWAA";
+        engine.main(new String[] {arg});
+    }
+    @Test
     public void saveTest() {
         world = new TETile[1][1];
         world[0][0] = Tileset.WALL;
@@ -42,8 +72,7 @@ public class EngineTest {
             if (engine.random.nextInt(2) == 0) {
                 r.nextInt(2);
                 engine.saveGame(world);
-                engine.getSavedRandom();
-                world = engine.getSavedWorld();
+                world = engine.getSavedGame();
                 assertEquals(world.length, 1);
                 assertEquals(world[0].length, 1);
                 assertEquals(world[0][0].character(), '#');
@@ -58,6 +87,8 @@ public class EngineTest {
     public void randomGenerateWorldAndActionTest() {
         Random rand = new Random(453151489);
         String arg = "N" + rand.nextInt(475753) + "S" + "WDASAA:Q";
+        engine.main(new String[] {arg});
+        arg = "N543SWWWWAA";
         engine.main(new String[] {arg});
     }
     @Test

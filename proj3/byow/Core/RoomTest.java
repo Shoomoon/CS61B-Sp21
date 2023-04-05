@@ -29,22 +29,22 @@ public class RoomTest {
     @Test
     public void drawRoomTest() {
         Room room = new Room(2, 2, 4, 4);
-        room.drawRoom(tiles);
+        room.createRoom(tiles);
         ter.renderFrame(tiles);
 
         Room room1 = new Room(3, 4, 5, 8);
-        room1.drawRoom(tiles);
+        room1.createRoom(tiles);
         ter.renderFrame(tiles);
 
         Room room2 = new Room(3, 18, 4, 4);
-        room2.drawRoom(tiles);
+        room2.createRoom(tiles);
         ter.renderFrame(tiles);
 
         room2.connectWithRoom(tiles, random, room1);
         ter.renderFrame(tiles);
 
         Room room3 = new Room(30, 26, 8, 8);
-        room3.drawRoom(tiles);
+        room3.createRoom(tiles);
         room3.connectWithRoom(tiles, random, room2);
         ter.renderFrame(tiles);
     }

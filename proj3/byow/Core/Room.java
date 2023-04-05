@@ -16,7 +16,7 @@ public class Room {
         this.width = w;
         this.height = h;
     }
-    public void drawRoom(TETile[][] tiles) {
+    public void createRoom(TETile[][] tiles) {
         // draw floor
         for (int dx = 0; dx < width; dx++) {
             for (int dy = 0; dy < height; dy++) {
@@ -79,7 +79,7 @@ public class Room {
             int i = RandomUtils.uniform(random, wl, wr);
             int w = Math.min(Engine.WIDTH - i - 1, RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1));
             Room hallway = new Room(i, ht, w, hb - ht);
-            hallway.drawRoom(tiles);
+            hallway.createRoom(tiles);
             return;
         }
         // if only have overlap alone y-axis, then use a horizontal hallway to connect with each other
@@ -87,7 +87,7 @@ public class Room {
             int j = RandomUtils.uniform(random, hb, ht);
             int h = Math.min(Engine.HEIGHT - j - 1, RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1));
             Room hallway = new Room(wr, j, wl - wr, h);
-            hallway.drawRoom(tiles);
+            hallway.createRoom(tiles);
             return;
         }
         int hallwayWidth = RandomUtils.uniform(random, Engine.MINHALLWAYWIDTH, Engine.MAXHALLWAYWIDTH + 1);
@@ -98,7 +98,7 @@ public class Room {
         int heightVerHallway = Math.max(yHorHallway - yVerHallway, r.y - yHorHallway);
         Room hallwayHorizontal = new Room(xHorHallway, yHorHallway, heightHorHallway, Math.min(Engine.HEIGHT - yHorHallway - 1, hallwayWidth));
         Room hallwayVertical = new Room(xHorHallway, yVerHallway, Math.min(Engine.WIDTH - xHorHallway - 1, hallwayWidth), heightVerHallway);
-        hallwayHorizontal.drawRoom(tiles);
-        hallwayVertical.drawRoom(tiles);
+        hallwayHorizontal.createRoom(tiles);
+        hallwayVertical.createRoom(tiles);
     }
 }

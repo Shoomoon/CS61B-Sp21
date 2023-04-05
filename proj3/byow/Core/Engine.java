@@ -5,6 +5,7 @@ import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
 import edu.princeton.cs.introcs.StdDraw;
 
+import java.awt.*;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Random;
@@ -31,6 +32,9 @@ public class Engine {
     public static final int XDOWNSET = 0;
     // The blank tiles on the top.
     public static final int YDOWNSET = 4;
+    public static final Font MESSAGEFONT = new Font("Monaco", Font.BOLD, 30);
+    public static final Font INITINFOFONT = new Font("Monaco", Font.BOLD, 30);
+    public static final Font TILEFONT = new Font("Monaco", Font.BOLD, 14);
     // The directory to store worldmaps
     public static final File BLOBS = new File(System.getProperty("user.dir"), ".maps");
     public static final File RANDOM = new File(BLOBS, "random.txt");
@@ -39,7 +43,10 @@ public class Engine {
     public static final File DOOR = new File(BLOBS, "door.txt");
     public static final File GUARDIANS = new File(BLOBS, "guardians.txt");
     public static final File TREASURES = new File(BLOBS, "treasures.txt");
+    public static final Position livesPosStart = new Position(2, HEIGHT + YDOWNSET / 2);
     public static final int[][] DIR = new int[][]{{0, 1}, {0, -1}, {-1, 0}, {1, 0}};
+    public static final Color BACKGROUND = Color.BLACK;
+    public static final Color TEXTCOLOR = Color.WHITE;
     //maximum treasures
     public static final int MAXTREASURES = 4;
     //maximum guardians
@@ -52,15 +59,9 @@ public class Engine {
     private Position[] guardians;
     private int lives;
 
-
-
-
-
-
     public void main(String[] args) {
         Engine engine = new Engine();
         TETile[][] tiles = engine.interactWithInputString(args[0]);
-        engine.renderFrame(tiles);
     }
     public Engine() {
         if (!BLOBS.exists()) {
@@ -69,18 +70,39 @@ public class Engine {
         lives = MAXINITLIVES;
     }
     public void renderFrame(TETile[][] tiles) {
+        StdDraw.setFont(TILEFONT);
         ter.renderFrame(tiles);
+        drawLives();
+        StdDraw.show();
     }
-
+    private void drawLives() {
+        StdDraw.setFont(TILEFONT);
+        TETile live = Tileset.FLOWER;
+        for (int i = 0; i < lives; i++) {
+            live.draw(livesPosStart.x + i, livesPosStart.y);
+        }
+    }
+    private void removeLiveOnce() {
+        lives -= 1;
+        StdDraw.setFont(TILEFONT);
+        Tileset.NOTHING.draw(livesPosStart.x + lives, livesPosStart.y);
+        StdDraw.show();
+    }
+    private void addLiveOnce() {
+        StdDraw.setFont(TILEFONT);
+        Tileset.FLOWER.draw(livesPosStart.x + lives, livesPosStart.y);
+        lives += 1;
+        StdDraw.show();
+    }
     private void randomGenerateWorld(TETile[][] tiles) {
         // random generate world map
         fillTileWorldWithNothing(tiles);
         ArrayList<Room> rooms = new ArrayList<>();
         for (int i = 1; i < WIDTH; i++) {
             for (int j = 1; j < HEIGHT; j++) {
-                if (tiles[i][j].equal(Tileset.NOTHING) && isARoom(i, j)) {
+                if (tiles[i][j].equal(Tileset.NOTHING) && isRoom(i, j)) {
                     Room room = generateRoom(i, j);
-                    room.drawRoom(tiles);
+                    room.createRoom(tiles);
 //                    ter.renderFrame(tiles);
                     // choose the nearest room and connect to it
                     Room connectRoom = selectRoom(room, rooms);
@@ -247,7 +269,7 @@ public class Engine {
         return new Room(i, j, width, height);
     }
 
-    private boolean isARoom(int i, int j) {
+    private boolean isRoom(int i, int j) {
         //randomly decides if there is a room whose bottom left corner located at (i, j)
         // must have enough space to draw the room (including walls)
         return WIDTH - i >= MINROOMWIDTH + 1 && HEIGHT - j >= MINROOMHEIGHT + 1 && random.nextDouble() < ROOMPROBABILITY;
@@ -293,18 +315,9 @@ public class Engine {
         }
     }
     public boolean hasSavedGame() {
-        return WORLD.exists() && RANDOM.exists();
-    }
-    public void getSavedRandom() {
-        if (!RANDOM.exists()) {
-            throw new IllegalCallerException("No previous game can be loaded!");
-        }
-//        Random r = Utiles.readObject(RANDOM, Random.class);
-//        System.out.print(r.nextInt(556));
-        random = Utiles.readObject(RANDOM, Random.class);
-    }
-    public TETile[][] getSavedWorld() {
-        return getSavedWorld(WORLD);
+        return WORLD.exists() && RANDOM.exists()
+                && PLAYER.exists() && DOOR.exists()
+                && TREASURES.exists() && GUARDIANS.exists();
     }
 
     public void saveGame(TETile[][] world) {
@@ -316,50 +329,159 @@ public class Engine {
         Utiles.writeObject(TREASURES, treasures);
     }
 
-    private TETile[][] getSavedGame() {
+    public TETile[][] getSavedGame() {
         getSavedRandom(RANDOM);
         getSavedPlayer(PLAYER);
         getSavedDoor(DOOR);
-        getSavedGruadians(GUARDIANS);
+        getSavedGuardians(GUARDIANS);
         getSavedTreasures(TREASURES);
         return getSavedWorld(WORLD);
     }
     private void getSavedPlayer(File file) {
-        savedFileCheck(file);
         player = Utiles.readObject(file, Position.class);
     }
     private void getSavedDoor(File file) {
-        savedFileCheck(file);
         door = Utiles.readObject(file, Position.class);
     }
     private void getSavedRandom(File file) {
-        savedFileCheck(file);
         random = Utiles.readObject(file, Random.class);
     }
-    private void getSavedGruadians(File file) {
-        savedFileCheck(file);
+    private void getSavedGuardians(File file) {
         guardians = Utiles.readObject(file, Position[].class);
     }
     private void getSavedTreasures(File file) {
-        savedFileCheck(file);
         treasures = Utiles.readObject(file, Position[].class);
     }
     private TETile[][] getSavedWorld(File file) {
-        savedFileCheck(file);
         return Utiles.readObject(file, TETile[][].class);
     }
-    private void savedFileCheck(File file) {
-        if (!file.exists()) {
-            throw new IllegalCallerException("No previous game can be loaded!");
-        }
-    }
 
+    private void initializeCanvas() {
+        ter.initialize(WIDTH + XDOWNSET, HEIGHT + YDOWNSET);
+    }
     /**
      * Method used for exploring a fresh world. This method should handle all inputs,
      * including inputs from the main menu.
      */
     public void interactWithKeyboard() {
+        initializeCanvas();
+        TETile[][] finalWorldFrame = new TETile[WIDTH][HEIGHT];
+        boolean worldInitialized = false;
+        drawInitInfo("Please input your commands:");
+        while (true) {
+            char c = Character.toUpperCase(getNextKeyTyped());
+            if (c == 'L') {
+                drawInitInfo(String.valueOf(c), 500);
+                finalWorldFrame = getSavedGame();
+                renderFrame(finalWorldFrame);
+                worldInitialized = true;
+            } else if (c == 'N') {
+                StringBuilder seed = new StringBuilder();
+                drawInitInfo(String.valueOf(c));
+                while (true) {
+                    char c1 = Character.toUpperCase(getNextKeyTyped());
+                    if (Character.isDigit(c1)) {
+                        seed.append(c1);
+                        drawInitInfo(c + seed.toString());
+                    } else if (c1 == 'S') {
+                        if (seed.isEmpty()) {
+                            drawInitInfo("Invalid Input! Please try again!", 1000);
+                            clearInitInfo();
+                            break;
+                        }
+                        drawInitInfo(c + seed.toString() + c1, 500);
+                        random = new Random(Long.parseLong(seed.toString()));
+                        randomGenerateWorld(finalWorldFrame);
+                        renderFrame(finalWorldFrame);
+                        worldInitialized = true;
+                        break;
+                    } else {
+                        drawMessage("Invalid Input! Please try again!", 2000);
+                        break;
+                    }
+                }
+            } else if (c == ':') {
+                if (!worldInitialized) {
+                    drawInitInfo(":");
+                }
+                char c1 = Character.toUpperCase(getNextKeyTyped());
+                if (c1 == 'Q') {
+                    if (!worldInitialized) {
+                        drawInitInfo(":Q", 500);
+                        flashInitInfo("No data can be saved!");
+                    } else {
+                        saveGame(finalWorldFrame);
+                        flashMessage("Game was Saved!", 1000);
+                    }
+                    break;
+                } else {
+                    if (worldInitialized) {
+                        drawMessage("Please enter :Q if you want to save and quit.", 2000);
+                    } else {
+                        drawInitInfo(":" + c1, 500);
+                        drawInitInfo("Invalid Input!", 1000);
+                    }
+                }
+            } else if ("WASD".indexOf(c) >= 0) {
+                if (!worldInitialized) {
+                    drawInitInfo("No Game Exists!", 1000);
+                }
+                if (move(finalWorldFrame, c)) {
+                    break;
+                }
+            } else {
+                drawMessage("Invalid Input! Please Try Again!", 2000);
+            }
+        }
+        StdDraw.clear(Color.BLACK);
+        drawInitInfo("Please Close the Game!");
     }
+
+    private void flashMessage(String s, int flashTime) {
+        while (flashTime >= 0) {
+            drawMessage(s, 200);
+            drawMessage("", 200);
+            flashTime -= 200;
+        }
+        drawMessage(s);
+    }
+    private void flashInitInfo(String s) {
+        int t = 1000;
+        while (t >= 0) {
+            drawInitInfo(s, 200);
+            drawInitInfo("", 200);
+            t -= 200;
+        }
+        drawInitInfo(s);
+    }
+
+    private void drawInitInfo(String info, int ms) {
+        clearInitInfo();
+        StdDraw.setFont(INITINFOFONT);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, info);
+        StdDraw.show(ms);
+        clearInitInfo();
+    }
+    private void clearInitInfo() {
+        clearMessageHelper(WIDTH / 2.0, HEIGHT / 2.0, 25, 2);
+    }
+    private void drawInitInfo(String info) {
+        clearInitInfo();
+        StdDraw.setFont(INITINFOFONT);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, info);
+        StdDraw.show();
+    }
+
+    private char getNextKeyTyped() {
+        while (true) {
+            if (StdDraw.hasNextKeyTyped()) {
+                return StdDraw.nextKeyTyped();
+            }
+        }
+    }
+
 
     /**
      * Method used for autograding and testing your code. The input string will be a series
@@ -411,7 +533,9 @@ public class Engine {
         // for each action, move the player in the direction
         if (!info[2].isEmpty()) {
             for (int i = 0; i < info[2].length(); i++) {
-                move(finalWorldFrame, info[2].charAt(i));
+                if (move(finalWorldFrame, info[2].charAt(i))) {
+                    return finalWorldFrame;
+                }
                 StdDraw.pause(500);
             }
         }
@@ -423,69 +547,111 @@ public class Engine {
         return finalWorldFrame;
     }
 
-    private void move(TETile[][] finalWorldFrame, char c) {
+    private boolean move(TETile[][] finalWorldFrame, char c) {
+        // if lost all lives or success entering the door, return true, otherwise return false
         int dx = 0;
         int dy = 0;
-        if (c == 'W' || c == 'w') {
+        if (c == 'W') {
             dy = 1;
-        } else if (c == 'A' || c == 'a') {
+        } else if (c == 'A') {
             dx = -1;
-        } else if (c == 'S' || c == 's') {
+        } else if (c == 'S') {
             dy = -1;
-        } else if (c == 'D' || c == 'd') {
+        } else if (c == 'D') {
             dx = 1;
         }
         Position nextPos = new Position(player.x + dx, player.y + dy);
         // if next tile is wall
         if (finalWorldFrame[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
-            return;
+            return false;
         } else if (nextPos.equal(door)) {
             // deal with door
             congratulations(finalWorldFrame);
-            return;
+            return true;
         }
 
         for (Position guardian: guardians) {
             // deal with guardians
             if (nextPos.equal(guardian)) {
-                deadOnce(finalWorldFrame, guardian);
-                return;
+                if (lives <= 0) {
+                    // game is over, flash the message "Game Over!"
+                    flashMessage("Game Over!", 1000);
+                    StdDraw.clear(BACKGROUND);
+                    drawInitInfo("Game Over!", 2000);
+                    return true;
+                }
+                deadOnce();
+                return false;
             }
         }
         // deal with treasure
         for (Position treasure: treasures) {
             if (nextPos.equal(treasure)) {
-                openTreasure(finalWorldFrame, treasure);
+                openTreasure(treasure);
             }
         }
+        // update world map
+        StdDraw.setFont(TILEFONT);
         finalWorldFrame[player.x][player.y] = Tileset.FLOOR;
         finalWorldFrame[player.x][player.y].draw(player.x, player.y);
-        finalWorldFrame[nextPos.x][nextPos.y] = Tileset.AVATAR;
-        finalWorldFrame[nextPos.x][nextPos.y].draw(nextPos.x, nextPos.y);
         player = nextPos;
+        finalWorldFrame[player.x][player.y] = Tileset.AVATAR;
+        finalWorldFrame[player.x][player.y].draw(player.x, player.y);
         StdDraw.show();
+        return false;
 //        renderFrame(finalWorldFrame);
     }
 
-    private void openTreasure(TETile[][] finalWorldFrame, Position treasure) {
-        flashTile(finalWorldFrame, treasure, Tileset.FLOOR, Tileset.TREASURE);
-        lives += 1;
+    private void drawMessage(String message) {
+        drawMessageHelper(message);
+        StdDraw.show();
+    }
+    private void drawMessage(String message, int microsecond) {
+        drawMessageHelper(message);
+        StdDraw.show(microsecond);
+        clearMessage();
+    }
+    private void drawMessageHelper(String message) {
+        clearMessage();
+        StdDraw.setFont(MESSAGEFONT);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.text(WIDTH / 2.0, livesPosStart.y, message);
+    }
+    public void clearMessage() {
+        clearMessageHelper(WIDTH / 2.0, livesPosStart.y, 30,1);
+    }
+    public void clearMessageHelper(double centerX, double centerY, double halfWidth, double halfHeight) {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(centerX, centerY, halfWidth, halfHeight);
+//        int messageSize = 20;
+//        for (int i = 0; i < messageSize; i++) {
+//            Tileset.NOTHING.draw(WIDTH / 2 - 10 + i, livesPosStart.y);
+//            Tileset.NOTHING.draw(WIDTH / 2 - 10 + i, livesPosStart.y - 1);
+//        }
+        StdDraw.show();
     }
 
-    private void deadOnce(TETile[][] finalWorldFrame, Position guardian) {
-        flashTile(finalWorldFrame, guardian, Tileset.FLOOR, Tileset.GUARDIAN);
-        lives -= 1;
-        finalWorldFrame[player.x][player.y] = Tileset.FLOOR;
+    private void openTreasure(Position treasure) {
+        flashTile(treasure, Tileset.TREASURE, 1000, 200);
+        addLiveOnce();
     }
 
-    // flash between Tile t0 and t1
-    private void flashTile(TETile[][] finalWorldFrame, Position pos, TETile t0, TETile t1) {
-        int flashTime = 1000;
-        int flashBreak = 200;
+    private void deadOnce() {
+        drawMessage("Dead Once!");
+        flashTile(player, Tileset.AVATAR, 1000, 200);
+        removeLiveOnce();
+        clearMessage();
+    }
+
+    // flash between Tile NOTHING and tile
+    private void flashTile(Position pos, TETile tile, int flashTime, int flashBreak) {
+        StdDraw.setFont(TILEFONT);
         while (flashTime >= 0) {
-            t0.draw(pos.x, pos.y);
+            Tileset.NOTHING.draw(pos.x, pos.y);
+            StdDraw.show();
             StdDraw.pause(flashBreak);
-            t1.draw(pos.x, pos.y);
+            tile.draw(pos.x, pos.y);
+            StdDraw.show();
             StdDraw.pause(flashBreak);
             flashTime -= flashBreak;
         }
@@ -493,6 +659,10 @@ public class Engine {
 
     private void congratulations(TETile[][] finalWorldFrame) {
         finalWorldFrame[player.x][player.y] = Tileset.FLOOR;
+        finalWorldFrame[player.x][player.y].draw(player.x, player.y);
         finalWorldFrame[door.x][door.y] = Tileset.UNLOCKED_DOOR;
+        finalWorldFrame[door.x][door.y].draw(door.x, door.y);
+        flashMessage("Congratulations!", 1000);
+        StdDraw.show();
     }
 }
