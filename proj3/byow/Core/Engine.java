@@ -8,6 +8,7 @@ import edu.princeton.cs.introcs.StdDraw;
 import java.awt.*;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,7 +22,7 @@ public class Engine {
     public static final int WIDTH = 80;
     public static final int HEIGHT = 60;
     public static final double ROOMPROBABILITY = 0.01;
-    public static final double RANDOMSELECTROOMPROBABILITY = 0.1;
+    public static final double CONNECTROOMPROBABILITY = 0.5;
     public static final int MINROOMWIDTH = 3;
     public static final int MAXROOMWIDTH = 10;
     public static final int MINROOMHEIGHT = 3;
@@ -43,6 +44,8 @@ public class Engine {
     public static final File DOOR = new File(BLOBS, "door.txt");
     public static final File GUARDIANS = new File(BLOBS, "guardians.txt");
     public static final File TREASURES = new File(BLOBS, "treasures.txt");
+
+    private static final File LIGHTS = new File(BLOBS, "lights.txt");
     public static final Position livesPosStart = new Position(2, HEIGHT + YDOWNSET / 2);
     public static final int[][] DIR = new int[][]{{0, 1}, {0, -1}, {-1, 0}, {1, 0}};
     public static final Color BACKGROUND = Color.BLACK;
@@ -53,11 +56,19 @@ public class Engine {
     public static final int MAXGUARDIANS = 8;
     // maximum initial lives
     public static final int MAXINITLIVES = 3;
+    public static final int MAXLIGHTS = 6;
+    public static final int MINLIGHTS = 3;
+    public static final int LIGHTRANGE = 6;
+    public static final int MAXROOMCONNECTION = 3;
     private Position player;
     private Position door;
     private Position[] treasures;
     private Position[] guardians;
+    private Position[] lights;
     private int lives;
+    // Turn lights on or off, toggled with key 'H'
+    private boolean enableLights = false;
+
 
     public void main(String[] args) {
         Engine engine = new Engine();
@@ -98,72 +109,68 @@ public class Engine {
         // random generate world map
         fillTileWorldWithNothing(tiles);
         ArrayList<Room> rooms = new ArrayList<>();
+        // random generate rooms and randomly connect to previous room
         for (int i = 1; i < WIDTH; i++) {
             for (int j = 1; j < HEIGHT; j++) {
                 if (tiles[i][j].equal(Tileset.NOTHING) && isRoom(i, j)) {
                     Room room = generateRoom(i, j);
                     room.createRoom(tiles);
 //                    ter.renderFrame(tiles);
-                    // choose the nearest room and connect to it
-                    Room connectRoom = selectRoom(room, rooms);
-                    // if room has overlap with other room, don't need to draw hallway
-                    if (connectRoom != null) {
-                        room.connectWithRoom(tiles, random, connectRoom);
-//                        ter.renderFrame(tiles);
+                    // choose the nearest room and connect to it via hallway, and do nothing if has overlap
+                    List<Room> connectRoomsCandidates = nearest2Rooms(room, rooms);
+                    room.connectWithRoom(tiles, random, connectRoomsCandidates.get(0));
+                    // randomly connect to the 2nd nearest room
+                    if (RandomUtils.uniform(random) < CONNECTROOMPROBABILITY) {
+                        room.connectWithRoom(tiles, random, connectRoomsCandidates.get(1));
                     }
+
+//                    Room connectRoom = nearestRoom(room, rooms);
+//                    room.connectWithRoom(tiles, random, connectRoom);
+//                    // randomly select another room to connect with
+//                    if (!rooms.isEmpty() && RandomUtils.uniform(random) < CONNECTROOMPROBABILITY) {
+//                        Room anotherRoom = rooms.get(RandomUtils.uniform(random, rooms.size()));
+//                        room.connectWithRoom(tiles, random, anotherRoom);
+//                    }
                     rooms.add(room);
                 }
             }
         }
+
         // random generate player
-        randomGeneratePlayer(tiles);
+        player = randomGenerateMultiPos(tiles, 1, 1, Tileset.AVATAR)[0];
         // random outgoing door
-        randomGenerateDoor(tiles);
+        door = randomGenerateDoor(tiles);
         // random treasures
-        randomGenerateTreasures(tiles);
+        treasures = randomGenerateMultiPos(tiles, 1, MAXTREASURES, Tileset.TREASURE);
         // random generate guardians
-        randomGenerateGuardians(tiles);
+        guardians = randomGenerateMultiPos(tiles, 1, MAXGUARDIANS, Tileset.GUARDIAN);
+        // random generate lights
+        lights = randomGenerateMultiPos(tiles, MINLIGHTS, MAXLIGHTS, Tileset.LIGHT);
     }
 
-    private void randomGenerateGuardians(TETile[][] tiles) {
-        int guardianCounts = random.nextInt(MAXGUARDIANS) + 1;
-        guardians = new Position[guardianCounts];
-        int count = 0;
+    private Position[] randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount, TETile tile) {
+        int size = RandomUtils.uniform(random, minCount, maxCount + 1);
+        Position[] res = new Position[size];
+        int floorCount = 0;
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[0].length; j++) {
                 if (tiles[i][j].equal(Tileset.FLOOR)) {
-                    count += 1;
-                    if (random.nextInt(count) < guardianCounts) {
-                        guardians[random.nextInt(guardianCounts)] = new Position(i, j);
+                    floorCount += 1;
+                    if (floorCount <= size) {
+                        res[floorCount - 1] = new Position(i, j);
+                    } else if (RandomUtils.uniform(random, floorCount) < size) {
+                        res[RandomUtils.uniform(random, size)] = new Position(i, j);
                     }
                 }
             }
         }
-        for (Position p: guardians) {
-            tiles[p.x][p.y] = Tileset.GUARDIAN;
+        for (Position p: res) {
+            tiles[p.x][p.y] = tile;
         }
+        return res;
     }
 
-    private void randomGenerateTreasures(TETile[][] tiles) {
-        int treasureCounts = random.nextInt(MAXTREASURES) + 1;
-        treasures = new Position[treasureCounts];
-        int count = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[0].length; j++) {
-                if (tiles[i][j].equal(Tileset.FLOOR)) {
-                    count += 1;
-                    if (random.nextInt(count) < treasureCounts) {
-                        treasures[random.nextInt(treasureCounts)] = new Position(i, j);
-                    }
-                }
-            }
-        }
-        for (Position p: treasures) {
-            tiles[p.x][p.y] = Tileset.TREASURE;
-        }
-    }
-
-    private void randomGenerateDoor(TETile[][] tiles) {
+    private Position randomGenerateDoor(TETile[][] tiles) {
         int count = 0;
         int x = 0;
         int y = 0;
@@ -171,15 +178,15 @@ public class Engine {
             for (int j = 0; j < tiles[0].length; j++) {
                 if (validDoor(tiles, i, j)) {
                     count += 1;
-                    if (random.nextInt(count) == 0) {
+                    if (RandomUtils.uniform(random, count) == 0) {
                         x = i;
                         y = j;
                     }
                 }
             }
         }
-        door = new Position(x, y);
         tiles[x][y] = Tileset.LOCKED_DOOR;
+        return new Position(x, y);
     }
 
     private boolean validDoor(TETile[][] tiles, int i, int j) {
@@ -204,27 +211,49 @@ public class Engine {
         // from left tile
         return (i + 1 == tiles.length || tiles[i + 1][j].equal(Tileset.NOTHING)) && i > 0 && tiles[i - 1][j].equal(Tileset.FLOOR);
     }
+    // select the 2 nearest rooms
+    // if there are more than 2 rooms, uniformly select any of them
+    private List<Room> nearest2Rooms(Room room, List<Room> rooms) {
+        // only need to store at most 2 nearest rooms
+        // and one 2nd nearest room
+        Room r0 = room;
+        Room r1 = room;
+        int d0 = WIDTH + HEIGHT + 1;
+        int count0 = 0;
+        int d1 = WIDTH + HEIGHT + 1;
+        int count1 = 0;
+        for (Room r: rooms) {
+            int curDis = room.distance(r);
+            if (curDis < d0) {
+                r1 = r0;
+                d1 = d0;
+                count1 = count0;
 
-    private void randomGeneratePlayer(TETile[][] tiles) {
-        int count = 0;
-        int x = 0;
-        int y = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[0].length; j++) {
-                if (tiles[i][j].equal(Tileset.FLOOR)) {
-                    count += 1;
-                    if (random.nextInt(count) == 0) {
-                        x = i;
-                        y = j;
-                    }
+                r0 = r;
+                d0 = curDis;
+                count0 = 1;
+            } else if (curDis == d0) {
+                count0 += 1;
+                if (RandomUtils.uniform(random, count0) == 0) {
+                    r0 = r;
+                }
+            } else if (curDis < d1) {
+                r1 = r;
+                d1 = curDis;
+                count1 = 1;
+            } else if (curDis == d1) {
+                count1 += 1;
+                if (RandomUtils.uniform(random, count1) == 0) {
+                    r1 = r;
                 }
             }
         }
-        player = new Position(x, y);
-        tiles[x][y] = Tileset.AVATAR;
+        List<Room> res = new ArrayList<>();
+        res.add(r0);
+        res.add(r1);
+        return res;
     }
-
-    private Room selectRoom(Room room, ArrayList<Room> rooms) {
+    private Room nearestRoom(Room room, ArrayList<Room> rooms) {
 //        // randomly select a room
 //        if (rooms == null || rooms.isEmpty()) {
 //            return null;
@@ -232,21 +261,15 @@ public class Engine {
 //        return rooms.get(RandomUtils.uniform(random, rooms.size()));
         // select the nearest room
         // if there are more than 1 nearest room, uniformly choose one of them
-        // if there is no other room, or the room is overlapped with any room, return null
-        if (rooms == null || rooms.isEmpty()) {
-            return null;
-        }
-        if (random.nextDouble() < RANDOMSELECTROOMPROBABILITY) {
-            return rooms.get(RandomUtils.uniform(random, rooms.size()));
-        }
-        Room nearestRoom = rooms.get(0);
+        // if there is no other room, or the room is overlapped with any room, return room itself
+        Room nearestRoom = room;
         int count = 0;
         int minDis = WIDTH + HEIGHT;
         for (Room r:rooms) {
             int curDis = room.distance(r);
-        // if distance< 0, then this two room has overlap with other room, just return null
+        // if distance< 0, then this two room has overlap with other room, just return room itself
             if (curDis < 0) {
-                return null;
+                return room;
             }
             if (curDis < minDis) {
                 minDis = curDis;
@@ -272,7 +295,7 @@ public class Engine {
     private boolean isRoom(int i, int j) {
         //randomly decides if there is a room whose bottom left corner located at (i, j)
         // must have enough space to draw the room (including walls)
-        return WIDTH - i >= MINROOMWIDTH + 1 && HEIGHT - j >= MINROOMHEIGHT + 1 && random.nextDouble() < ROOMPROBABILITY;
+        return WIDTH - i >= MINROOMWIDTH + 1 && HEIGHT - j >= MINROOMHEIGHT + 1 && RandomUtils.uniform(random) < ROOMPROBABILITY;
     }
 
     public void fillTileWorldWithNothing(TETile[][] tiles) {
@@ -313,11 +336,26 @@ public class Engine {
         if (RANDOM.exists()) {
             RANDOM.delete();
         }
+        if (PLAYER.exists()) {
+            PLAYER.delete();
+        }
+        if (DOOR.exists()) {
+            DOOR.delete();
+        }
+        if (TREASURES.exists()) {
+            TREASURES.delete();
+        }
+        if (GUARDIANS.exists()) {
+            GUARDIANS.delete();
+        }
+        if (LIGHTS.exists()) {
+            LIGHTS.delete();
+        }
     }
     public boolean hasSavedGame() {
         return WORLD.exists() && RANDOM.exists()
                 && PLAYER.exists() && DOOR.exists()
-                && TREASURES.exists() && GUARDIANS.exists();
+                && TREASURES.exists() && GUARDIANS.exists() && LIGHTS.exists();
     }
 
     public void saveGame(TETile[][] world) {
@@ -327,33 +365,30 @@ public class Engine {
         Utiles.writeObject(DOOR, door);
         Utiles.writeObject(GUARDIANS, guardians);
         Utiles.writeObject(TREASURES, treasures);
+        Utiles.writeObject(LIGHTS, lights);
     }
 
     public TETile[][] getSavedGame() {
-        getSavedRandom(RANDOM);
-        getSavedPlayer(PLAYER);
-        getSavedDoor(DOOR);
-        getSavedGuardians(GUARDIANS);
-        getSavedTreasures(TREASURES);
-        return getSavedWorld(WORLD);
+        random = getSavedRandom();
+        player = getSavedItem(PLAYER);
+        door = getSavedItem(DOOR);
+        guardians = getSavedMultiItems(GUARDIANS);
+        treasures = getSavedMultiItems(TREASURES);
+        lights = getSavedMultiItems(LIGHTS);
+        return getSavedWorld();
     }
-    private void getSavedPlayer(File file) {
-        player = Utiles.readObject(file, Position.class);
+
+    private Position[] getSavedMultiItems(File file) {
+        return Utiles.readObject(file, Position[].class);
     }
-    private void getSavedDoor(File file) {
-        door = Utiles.readObject(file, Position.class);
+    private Position getSavedItem(File file) {
+        return Utiles.readObject(file, Position.class);
     }
-    private void getSavedRandom(File file) {
-        random = Utiles.readObject(file, Random.class);
+    private Random getSavedRandom() {
+        return Utiles.readObject(RANDOM, Random.class);
     }
-    private void getSavedGuardians(File file) {
-        guardians = Utiles.readObject(file, Position[].class);
-    }
-    private void getSavedTreasures(File file) {
-        treasures = Utiles.readObject(file, Position[].class);
-    }
-    private TETile[][] getSavedWorld(File file) {
-        return Utiles.readObject(file, TETile[][].class);
+    private TETile[][] getSavedWorld() {
+        return Utiles.readObject(WORLD, TETile[][].class);
     }
 
     private void initializeCanvas() {
@@ -367,41 +402,42 @@ public class Engine {
         initializeCanvas();
         TETile[][] finalWorldFrame = new TETile[WIDTH][HEIGHT];
         boolean worldInitialized = false;
-        drawInitInfo("Please input your commands:");
+        drawMenu();
         while (true) {
             char c = Character.toUpperCase(getNextKeyTyped());
             if (c == 'L') {
+                clearMenu();
                 drawInitInfo(String.valueOf(c), 500);
                 finalWorldFrame = getSavedGame();
                 renderFrame(finalWorldFrame);
                 worldInitialized = true;
             } else if (c == 'N') {
+                clearMenu();
                 StringBuilder seed = new StringBuilder();
-                drawInitInfo(String.valueOf(c));
+                drawInitInfo("Seed: ");
                 while (true) {
                     char c1 = Character.toUpperCase(getNextKeyTyped());
                     if (Character.isDigit(c1)) {
                         seed.append(c1);
-                        drawInitInfo(c + seed.toString());
+                        drawInitInfo("Seed: " + seed.toString());
                     } else if (c1 == 'S') {
                         if (seed.isEmpty()) {
-                            drawInitInfo("Invalid Input! Please try again!", 1000);
+                            drawInitInfo("Invalid Input! Please input random seed first!", 1000);
                             clearInitInfo();
-                            break;
+                            continue;
                         }
-                        drawInitInfo(c + seed.toString() + c1, 500);
                         random = new Random(Long.parseLong(seed.toString()));
                         randomGenerateWorld(finalWorldFrame);
                         renderFrame(finalWorldFrame);
                         worldInitialized = true;
                         break;
                     } else {
-                        drawMessage("Invalid Input! Please try again!", 2000);
-                        break;
+                        continue;
                     }
                 }
             } else if (c == ':') {
                 if (!worldInitialized) {
+                    clearMenu();
                     drawInitInfo(":");
                 }
                 char c1 = Character.toUpperCase(getNextKeyTyped());
@@ -454,7 +490,17 @@ public class Engine {
         }
         drawInitInfo(s);
     }
-
+    private void drawMenu() {
+        StdDraw.clear(BACKGROUND);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.setFont(new Font("Monaco", Font.BOLD, 60));
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 + 8, "CS61B: THE GAME");
+        StdDraw.setFont(INITINFOFONT);
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 + 2, "New Game (N)");
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, "Load Game (L)");
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 - 2, "Quit (Q)");
+        StdDraw.show();
+    }
     private void drawInitInfo(String info, int ms) {
         clearInitInfo();
         StdDraw.setFont(INITINFOFONT);
@@ -465,6 +511,10 @@ public class Engine {
     }
     private void clearInitInfo() {
         clearMessageHelper(WIDTH / 2.0, HEIGHT / 2.0, 25, 2);
+    }
+    private void clearMenu() {
+        StdDraw.clear(BACKGROUND);
+        StdDraw.show();
     }
     private void drawInitInfo(String info) {
         clearInitInfo();

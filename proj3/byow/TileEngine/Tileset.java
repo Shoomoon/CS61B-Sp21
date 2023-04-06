@@ -36,6 +36,8 @@ public class Tileset {
 
     public static final TETile GUARDIAN = SAND;
     public static final TETile TREASURE = FLOWER;
+    public static final TETile LIGHT = new TETile('☀', new Color(128, 128, 128), Color.black,
+            "light");
 }
 
 
