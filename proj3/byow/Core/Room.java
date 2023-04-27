@@ -2,7 +2,6 @@ package byow.Core;
 
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
-import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.*;
 import java.io.Serializable;
@@ -19,7 +18,6 @@ public class Room implements Serializable {
     public static final Color LIGHTCOLOR = new Color(62, 78, 240);
     public static final double BASE = 0.78;
     private boolean enableLight = false;
-    public static final Font TILEFONT = Engine.TILEFONT;
     // generate a room with light
     public Room(int i, int j, int w, int h, Position light) {
         this.x = i;
@@ -83,34 +81,15 @@ public class Room implements Serializable {
             for (int j = b; j < t; j++) {
                 int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
                 // don't change back color if it is not floor or light
-                if (d != 0 && !tiles[i][j].equal(Tileset.FLOOR)) {
+                if (d != 0 && !tiles[i][j].equal(Tileset.FLOOR) && !tiles[i][j].equal(Tileset.AVATAR)) {
                     continue;
                 }
-                if (enableLight) {
-                    double factor = Math.pow(BASE, d);
-                    int redVal = (int) (LIGHTCOLOR.getRed() * factor);
-                    int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);
-                    int blueVal =  (int) (LIGHTCOLOR.getBlue() * factor);
-                    tiles[i][j] = tiles[i][j].changeBackgroundColor(new Color(redVal, greenVal, blueVal));
+                if (d == 0) {
+                    tiles[i][j] = Tileset.LIGHT;
                 } else {
-                    tiles[i][j] = tiles[i][j].changeBackgroundColor(Engine.BACKGROUND);
+                    tiles[i][j] = Tileset.FLOOR;
                 }
-            }
-        }
-    }
-    public void toggleLight(TETile[][] tiles, boolean lightOn) {
-        if (!hasLight || this.enableLight == lightOn) {
-            return;
-        }
-        this.enableLight = lightOn;
-        int l = Math.max(x, light.x - LIGHTRANGE);
-        int r = Math.min(x + width, light.x + LIGHTRANGE + 1);
-        int b = Math.max(y, light.y - LIGHTRANGE);
-        int t = Math.min(y + height, light.y + LIGHTRANGE + 1);
-        for (int i = l; i < r; i++) {
-            for (int j = b; j < t; j++) {
                 if (enableLight) {
-                    int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
                     double factor = Math.pow(BASE, d);
                     int redVal = (int) (LIGHTCOLOR.getRed() * factor);
                     int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);

@@ -61,17 +61,13 @@ public class Engine {
     public static final int MAXGUARDIANS = 8;
     // maximum initial lives
     public static final int MAXINITLIVES = 3;
-    public static final int MAXLIGHTS = 6;
-    public static final int MINLIGHTS = 3;
     public static final int SIGHTRANGE = 6;
-    public static final int MAXROOMCONNECTION = 3;
     private Position avatar;
     private Position door;
-    private List<Position> treasures;
-    private List<Position> guardians;
-    private List<Position> lights;
+    private ArrayList<Position> treasures;
+    private ArrayList<Position> guardians;
     private TETile tileUnderAvatar;
-    private List<Room> roomsList;
+    private ArrayList<Room> roomsList;
     private Integer lives;
     // Turn lights on or off, toggled with key 'H'
     private Boolean avatarSightOnly = false;
@@ -213,9 +209,9 @@ public class Engine {
         avatarSightOnly = false;
     }
 
-    private List<Position> randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount) {
+    private ArrayList<Position> randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount) {
         int size = RandomUtils.uniform(random, minCount, maxCount + 1);
-        List<Position> res = new ArrayList<>();
+        ArrayList<Position> res = new ArrayList<>();
         int floorCount = 0;
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[0].length; j++) {
@@ -462,7 +458,7 @@ public class Engine {
     }
 
     public TETile[][] getSavedGame() {
-        random = Utiles.readObject(RANDOM, Random.class);;
+        random = Utiles.readObject(RANDOM, Random.class);
         avatar = Utiles.readObject(AVATAR, Position.class);
         door = Utiles.readObject(DOOR, Position.class);
         guardians = Utiles.readObject(GUARDIANS, ArrayList.class);
@@ -507,7 +503,7 @@ public class Engine {
                     char c1 = Character.toUpperCase(getNextKeyTyped());
                     if (Character.isDigit(c1)) {
                         seed.append(c1);
-                        drawInitInfo("Seed: " + seed.toString());
+                        drawInitInfo("Seed: " + seed);
                     } else if (c1 == 'S') {
                         if (seed.isEmpty()) {
                             drawInitInfo("Invalid Input! Please input random seed first!", 1000);
@@ -565,6 +561,10 @@ public class Engine {
     private void randomToggleLight(TETile[][] finalWorldFrame) {
         Room room = roomsList.get(RandomUtils.uniform(random, roomsList.size()));
         room.toggleLight(finalWorldFrame);
+        if (avatar.x >= room.getX() && avatar.x < room.getX() + room.getWidth() && avatar.y >= room.getY() && avatar.y < room.getY() + room.getHeight()) {
+            tileUnderAvatar = finalWorldFrame[avatar.x][avatar.y];
+            finalWorldFrame[avatar.x][avatar.y] = Tileset.AVATAR;
+        }
         renderRoom(finalWorldFrame, room);
     }
     private void toggleAvatarSight(TETile[][] tiles) {
