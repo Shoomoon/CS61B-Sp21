@@ -7,6 +7,7 @@ import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.*;
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -33,21 +34,25 @@ public class Engine {
     public static final int XDOWNSET = 0;
     // The blank tiles on the top.
     public static final int YDOWNSET = 4;
+    public static final int XOFFSET = 0;
+    public static final int YOFFSET = 2;
     public static final Font MESSAGEFONT = new Font("Monaco", Font.BOLD, 30);
     public static final Font INITINFOFONT = new Font("Monaco", Font.BOLD, 30);
     public static final Font TILEFONT = new Font("Monaco", Font.BOLD, 14);
-    // The directory to store worldmaps
+    public static final Font INSTRUCTIONFONT = new Font("Monaco", Font.BOLD, 16);
+    // The directory to store world maps and variables
     public static final File BLOBS = new File(System.getProperty("user.dir"), ".maps");
     public static final File RANDOM = new File(BLOBS, "random.txt");
     public static final File WORLD = new File(BLOBS, "world.txt");
-    public static final File PLAYER = new File(BLOBS, "player.txt");
+    public static final File AVATAR = new File(BLOBS, "avatar.txt");
     public static final File DOOR = new File(BLOBS, "door.txt");
     public static final File GUARDIANS = new File(BLOBS, "guardians.txt");
     public static final File TREASURES = new File(BLOBS, "treasures.txt");
-
-    private static final File LIGHTS = new File(BLOBS, "lights.txt");
-    public static final Position livesPosStart = new Position(2, HEIGHT + YDOWNSET / 2);
-    public static final int[][] DIR = new int[][]{{0, 1}, {0, -1}, {-1, 0}, {1, 0}};
+    private static final File ROOMSLIST = new File(BLOBS, "roomsList.txt");
+    private static final File LIVES = new File(BLOBS, "lives.txt");
+    private static final File AVATARSIGHTONLY = new File(BLOBS, "avatarSightOnly.txt");
+    private static final File TILEUNDERAVATAR = new File(BLOBS, "tileUnderAvatar");
+    public static final Position livesPosStart = new Position(2, HEIGHT + YDOWNSET / 2 + YOFFSET);
     public static final Color BACKGROUND = Color.BLACK;
     public static final Color TEXTCOLOR = Color.WHITE;
     //maximum treasures
@@ -58,16 +63,18 @@ public class Engine {
     public static final int MAXINITLIVES = 3;
     public static final int MAXLIGHTS = 6;
     public static final int MINLIGHTS = 3;
-    public static final int LIGHTRANGE = 6;
+    public static final int SIGHTRANGE = 6;
     public static final int MAXROOMCONNECTION = 3;
-    private Position player;
+    private Position avatar;
     private Position door;
-    private Position[] treasures;
-    private Position[] guardians;
-    private Position[] lights;
-    private int lives;
+    private List<Position> treasures;
+    private List<Position> guardians;
+    private List<Position> lights;
+    private TETile tileUnderAvatar;
+    private List<Room> roomsList;
+    private Integer lives;
     // Turn lights on or off, toggled with key 'H'
-    private boolean enableLights = false;
+    private Boolean avatarSightOnly = false;
 
 
     public void main(String[] args) {
@@ -81,10 +88,58 @@ public class Engine {
         lives = MAXINITLIVES;
     }
     public void renderFrame(TETile[][] tiles) {
+        clearCanvas();
         StdDraw.setFont(TILEFONT);
-        ter.renderFrame(tiles);
+        if (!avatarSightOnly) {
+            ter.renderFrame(tiles);
+        } else {
+            renderAvatarSightOnly(tiles);
+        }
         drawLives();
+        drawInstructions();
         StdDraw.show();
+    }
+
+    private void drawInstructions() {
+        drawInstructions("Up(W) Down(S) Left(A) Right(D) Save & Quit(:Q) New Game(N) Randomly Toggle Light(G) Toggle Avatar Sight(H)");
+    }
+    private void drawInstructions(String s) {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, YOFFSET / 2.0, WIDTH / 2.0, YOFFSET / 2.0);
+        StdDraw.setFont(INSTRUCTIONFONT);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.text(WIDTH / 2.0 + XOFFSET, YOFFSET / 2.0, s);
+    }
+
+    public void renderRoom(TETile[][] tiles, Room room) {
+        StdDraw.setFont(TILEFONT);
+        int x = room.getX();
+        int y = room.getY();
+        int w = room.getWidth();
+        int h = room.getHeight();
+        for (int i = 0; i < w; i++) {
+            for (int j = 0; j < h; j++) {
+                int distance = Math.max(Math.abs(x + i - avatar.x), Math.abs(y + j - avatar.y));
+                if (!avatarSightOnly || distance <= SIGHTRANGE) {
+                    drawTile(tiles, x + i, y + j);
+                }
+            }
+        }
+        StdDraw.show();
+    }
+    private void renderAvatarSightOnly(TETile[][] tiles) {
+        clearMap();
+        for (int d = SIGHTRANGE; d >= 0; d--) {
+            for (int i = d - SIGHTRANGE; i <= SIGHTRANGE - d; i++) {
+                drawTile(tiles, avatar.x + i, avatar.y + d);
+                drawTile(tiles, avatar.x + i, avatar.y - d);
+            }
+        }
+    }
+    private void drawTile(TETile[][] tiles, int i, int j) {
+        if (i >= 0 && i < WIDTH && j >= 0 && j < HEIGHT) {
+            tiles[i][j].draw(i + XOFFSET, j + YOFFSET);
+        }
     }
     private void drawLives() {
         StdDraw.setFont(TILEFONT);
@@ -108,16 +163,19 @@ public class Engine {
     private void randomGenerateWorld(TETile[][] tiles) {
         // random generate world map
         fillTileWorldWithNothing(tiles);
-        ArrayList<Room> rooms = new ArrayList<>();
+        roomsList = new ArrayList<>();
         // random generate rooms and randomly connect to previous room
-        for (int i = 1; i < WIDTH; i++) {
-            for (int j = 1; j < HEIGHT; j++) {
+        for (int i = 1; i < WIDTH - 1; i++) {
+            for (int j = 1; j < HEIGHT - 1; j++) {
                 if (tiles[i][j].equal(Tileset.NOTHING) && isRoom(i, j)) {
-                    Room room = generateRoom(i, j);
+                    Room room = generateRoomAt(i, j);
+                    if (room == null) {
+                        continue;
+                    }
                     room.createRoom(tiles);
 //                    ter.renderFrame(tiles);
                     // choose the nearest room and connect to it via hallway, and do nothing if has overlap
-                    List<Room> connectRoomsCandidates = nearest2Rooms(room, rooms);
+                    List<Room> connectRoomsCandidates = nearest2Rooms(room);
                     room.connectWithRoom(tiles, random, connectRoomsCandidates.get(0));
                     // randomly connect to the 2nd nearest room
                     if (RandomUtils.uniform(random) < CONNECTROOMPROBABILITY) {
@@ -131,41 +189,48 @@ public class Engine {
 //                        Room anotherRoom = rooms.get(RandomUtils.uniform(random, rooms.size()));
 //                        room.connectWithRoom(tiles, random, anotherRoom);
 //                    }
-                    rooms.add(room);
+                    roomsList.add(room);
                 }
             }
         }
 
-        // random generate player
-        player = randomGenerateMultiPos(tiles, 1, 1, Tileset.AVATAR)[0];
+        // random generate avatar
+        avatar = randomGenerateMultiPos(tiles, 1, 1).get(0);
+        tileUnderAvatar = tiles[avatar.x][avatar.y];
+        tiles[avatar.x][avatar.y] = Tileset.AVATAR;
         // random outgoing door
         door = randomGenerateDoor(tiles);
         // random treasures
-        treasures = randomGenerateMultiPos(tiles, 1, MAXTREASURES, Tileset.TREASURE);
+        treasures = randomGenerateMultiPos(tiles, 1, MAXTREASURES);
+        for (Position treasure: treasures) {
+            tiles[treasure.x][treasure.y] = Tileset.TREASURE;
+        }
         // random generate guardians
-        guardians = randomGenerateMultiPos(tiles, 1, MAXGUARDIANS, Tileset.GUARDIAN);
-        // random generate lights
-        lights = randomGenerateMultiPos(tiles, MINLIGHTS, MAXLIGHTS, Tileset.LIGHT);
+        guardians = randomGenerateMultiPos(tiles, 1, MAXGUARDIANS);
+        for (Position guardian: guardians) {
+            tiles[guardian.x][guardian.y] = Tileset.GUARDIAN;
+        }
+        avatarSightOnly = false;
     }
 
-    private Position[] randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount, TETile tile) {
+    private List<Position> randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount) {
         int size = RandomUtils.uniform(random, minCount, maxCount + 1);
-        Position[] res = new Position[size];
+        List<Position> res = new ArrayList<>();
         int floorCount = 0;
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles[0].length; j++) {
                 if (tiles[i][j].equal(Tileset.FLOOR)) {
                     floorCount += 1;
                     if (floorCount <= size) {
-                        res[floorCount - 1] = new Position(i, j);
-                    } else if (RandomUtils.uniform(random, floorCount) < size) {
-                        res[RandomUtils.uniform(random, size)] = new Position(i, j);
+                        res.add(new Position(i, j));
+                    } else {
+                        int k = RandomUtils.uniform(random, floorCount);
+                        if (k < size) {
+                            res.set(k, new Position(i, j));
+                        }
                     }
                 }
             }
-        }
-        for (Position p: res) {
-            tiles[p.x][p.y] = tile;
         }
         return res;
     }
@@ -213,7 +278,7 @@ public class Engine {
     }
     // select the 2 nearest rooms
     // if there are more than 2 rooms, uniformly select any of them
-    private List<Room> nearest2Rooms(Room room, List<Room> rooms) {
+    private List<Room> nearest2Rooms(Room room) {
         // only need to store at most 2 nearest rooms
         // and one 2nd nearest room
         Room r0 = room;
@@ -222,7 +287,7 @@ public class Engine {
         int count0 = 0;
         int d1 = WIDTH + HEIGHT + 1;
         int count1 = 0;
-        for (Room r: rooms) {
+        for (Room r: roomsList) {
             int curDis = room.distance(r);
             if (curDis < d0) {
                 r1 = r0;
@@ -253,7 +318,7 @@ public class Engine {
         res.add(r1);
         return res;
     }
-    private Room nearestRoom(Room room, ArrayList<Room> rooms) {
+    private Room nearestRoom(Room room) {
 //        // randomly select a room
 //        if (rooms == null || rooms.isEmpty()) {
 //            return null;
@@ -265,7 +330,7 @@ public class Engine {
         Room nearestRoom = room;
         int count = 0;
         int minDis = WIDTH + HEIGHT;
-        for (Room r:rooms) {
+        for (Room r: roomsList) {
             int curDis = room.distance(r);
         // if distance< 0, then this two room has overlap with other room, just return room itself
             if (curDis < 0) {
@@ -286,10 +351,24 @@ public class Engine {
         return nearestRoom;
     }
 
-    private Room generateRoom(int i, int j) {
+    private Room generateRoomAt(int i, int j) {
+        // room at (i, j) must have no overlap with other rooms
+        // since rooms are created from left to right, bottom to top,
+        // so for room at (i, j), the width could be as big as possible,
+        // and only rooms on the top left will impact the height of the room
         int width = RandomUtils.uniform(random, MINROOMWIDTH, 1 + Math.min(WIDTH - i - 1, MAXROOMWIDTH));
-        int height = RandomUtils.uniform(random, MINROOMHEIGHT, 1 + Math.min(HEIGHT - j - 1, MAXROOMHEIGHT));
-        return new Room(i, j, width, height);
+        int maxHeight = Math.min(HEIGHT - j - 1, MAXROOMHEIGHT);
+        for (Room r: roomsList) {
+            if (r.getX() + r.getWidth() - 1 >= i && r.getY() > j) {
+                maxHeight = Math.min(maxHeight, r.getY() - j);
+            }
+        }
+        if (maxHeight < MINROOMHEIGHT) {
+            return null;
+        }
+        int height = RandomUtils.uniform(random, MINROOMHEIGHT, 1 + maxHeight);
+        Position light = new Position(RandomUtils.uniform(random, i, i + width), RandomUtils.uniform(random, j, j + height));
+        return new Room(i, j, width, height, light);
     }
 
     private boolean isRoom(int i, int j) {
@@ -311,11 +390,11 @@ public class Engine {
         if (arg == null || arg.isEmpty()) {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
-        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDd]*)(?<end>:[Qq])?.*$";
+        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq])?.*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
-            throw new IllegalArgumentException("Input argument should start with L/l or N/n + digits + S/s，followed by actions W/wA/aS/sD/d, and maybe end with :Qq" +
+            throw new IllegalArgumentException("Input argument should start with L/l or N/n + digits + S/s，followed by actions W/wA/aS/sD/dG/gH/h, and maybe end with :Q/q" +
                     "for example N12335SSSAW:Q, LWSSW:Q, N2464S, N8544S:Q.");
         }
         // capture load, seed, actions, and end requirement
@@ -336,8 +415,8 @@ public class Engine {
         if (RANDOM.exists()) {
             RANDOM.delete();
         }
-        if (PLAYER.exists()) {
-            PLAYER.delete();
+        if (AVATAR.exists()) {
+            AVATAR.delete();
         }
         if (DOOR.exists()) {
             DOOR.delete();
@@ -348,51 +427,58 @@ public class Engine {
         if (GUARDIANS.exists()) {
             GUARDIANS.delete();
         }
-        if (LIGHTS.exists()) {
-            LIGHTS.delete();
+        if (ROOMSLIST.exists()) {
+            ROOMSLIST.delete();
+        }
+        if (LIVES.exists()) {
+            LIVES.delete();
+        }
+        if (AVATARSIGHTONLY.exists()) {
+            AVATARSIGHTONLY.delete();
+        }
+        if (TILEUNDERAVATAR.exists()) {
+            TILEUNDERAVATAR.delete();
         }
     }
     public boolean hasSavedGame() {
         return WORLD.exists() && RANDOM.exists()
-                && PLAYER.exists() && DOOR.exists()
-                && TREASURES.exists() && GUARDIANS.exists() && LIGHTS.exists();
+                && AVATAR.exists() && DOOR.exists()
+                && TREASURES.exists() && GUARDIANS.exists()
+                && ROOMSLIST.exists() && LIVES.exists()
+                && AVATARSIGHTONLY.exists() && TILEUNDERAVATAR.exists();
     }
 
     public void saveGame(TETile[][] world) {
         Utiles.writeObject(WORLD, world);
         Utiles.writeObject(RANDOM, random);
-        Utiles.writeObject(PLAYER, player);
+        Utiles.writeObject(AVATAR, avatar);
         Utiles.writeObject(DOOR, door);
-        Utiles.writeObject(GUARDIANS, guardians);
-        Utiles.writeObject(TREASURES, treasures);
-        Utiles.writeObject(LIGHTS, lights);
+        Utiles.writeObject(GUARDIANS, (Serializable) guardians);
+        Utiles.writeObject(TREASURES, (Serializable) treasures);
+        Utiles.writeObject(ROOMSLIST, (Serializable) roomsList);
+        Utiles.writeObject(LIVES, lives);
+        Utiles.writeObject(AVATARSIGHTONLY, avatarSightOnly);
+        Utiles.writeObject(TILEUNDERAVATAR, tileUnderAvatar);
     }
 
     public TETile[][] getSavedGame() {
-        random = getSavedRandom();
-        player = getSavedItem(PLAYER);
-        door = getSavedItem(DOOR);
-        guardians = getSavedMultiItems(GUARDIANS);
-        treasures = getSavedMultiItems(TREASURES);
-        lights = getSavedMultiItems(LIGHTS);
-        return getSavedWorld();
-    }
-
-    private Position[] getSavedMultiItems(File file) {
-        return Utiles.readObject(file, Position[].class);
-    }
-    private Position getSavedItem(File file) {
-        return Utiles.readObject(file, Position.class);
-    }
-    private Random getSavedRandom() {
-        return Utiles.readObject(RANDOM, Random.class);
-    }
-    private TETile[][] getSavedWorld() {
+        random = Utiles.readObject(RANDOM, Random.class);;
+        avatar = Utiles.readObject(AVATAR, Position.class);
+        door = Utiles.readObject(DOOR, Position.class);
+        guardians = Utiles.readObject(GUARDIANS, ArrayList.class);
+        treasures = Utiles.readObject(TREASURES, ArrayList.class);
+        roomsList = Utiles.readObject(ROOMSLIST, ArrayList.class);
+        lives = Utiles.readObject(LIVES, Integer.class);
+        avatarSightOnly = Utiles.readObject(AVATARSIGHTONLY, Boolean.class);
+        tileUnderAvatar = Utiles.readObject(TILEUNDERAVATAR, TETile.class);
         return Utiles.readObject(WORLD, TETile[][].class);
     }
 
     private void initializeCanvas() {
-        ter.initialize(WIDTH + XDOWNSET, HEIGHT + YDOWNSET);
+        ter.initialize(WIDTH + XDOWNSET + XOFFSET, HEIGHT + YDOWNSET + YOFFSET, XOFFSET, YOFFSET);
+    }
+    private void clearCanvas() {
+        StdDraw.clear(BACKGROUND);
     }
     /**
      * Method used for exploring a fresh world. This method should handle all inputs,
@@ -406,13 +492,15 @@ public class Engine {
         while (true) {
             char c = Character.toUpperCase(getNextKeyTyped());
             if (c == 'L') {
-                clearMenu();
+                if (!hasSavedGame()) {
+                    drawInitInfo("No previous game can be loaded!", 1000);
+                    continue;
+                }
                 drawInitInfo(String.valueOf(c), 500);
                 finalWorldFrame = getSavedGame();
                 renderFrame(finalWorldFrame);
                 worldInitialized = true;
             } else if (c == 'N') {
-                clearMenu();
                 StringBuilder seed = new StringBuilder();
                 drawInitInfo("Seed: ");
                 while (true) {
@@ -423,7 +511,6 @@ public class Engine {
                     } else if (c1 == 'S') {
                         if (seed.isEmpty()) {
                             drawInitInfo("Invalid Input! Please input random seed first!", 1000);
-                            clearInitInfo();
                             continue;
                         }
                         random = new Random(Long.parseLong(seed.toString()));
@@ -431,13 +518,10 @@ public class Engine {
                         renderFrame(finalWorldFrame);
                         worldInitialized = true;
                         break;
-                    } else {
-                        continue;
                     }
                 }
             } else if (c == ':') {
                 if (!worldInitialized) {
-                    clearMenu();
                     drawInitInfo(":");
                 }
                 char c1 = Character.toUpperCase(getNextKeyTyped());
@@ -458,19 +542,34 @@ public class Engine {
                         drawInitInfo("Invalid Input!", 1000);
                     }
                 }
-            } else if ("WASD".indexOf(c) >= 0) {
+            } else if ("WASDGH".indexOf(c) >= 0) {
                 if (!worldInitialized) {
                     drawInitInfo("No Game Exists!", 1000);
                 }
-                if (move(finalWorldFrame, c)) {
+                if (c == 'G') {
+                    randomToggleLight(finalWorldFrame);
+                } else if (c == 'H') {
+                    toggleAvatarSight(finalWorldFrame);
+                } else if (move(finalWorldFrame, c)) {
                     break;
                 }
-            } else {
-                drawMessage("Invalid Input! Please Try Again!", 2000);
             }
+//            } else {
+//                drawMessage("Invalid Input! Please Try Again!", 1000);
+//            }
         }
         StdDraw.clear(Color.BLACK);
         drawInitInfo("Please Close the Game!");
+    }
+
+    private void randomToggleLight(TETile[][] finalWorldFrame) {
+        Room room = roomsList.get(RandomUtils.uniform(random, roomsList.size()));
+        room.toggleLight(finalWorldFrame);
+        renderRoom(finalWorldFrame, room);
+    }
+    private void toggleAvatarSight(TETile[][] tiles) {
+        this.avatarSightOnly = !this.avatarSightOnly;
+        renderFrame(tiles);
     }
 
     private void flashMessage(String s, int flashTime) {
@@ -491,36 +590,37 @@ public class Engine {
         drawInitInfo(s);
     }
     private void drawMenu() {
-        StdDraw.clear(BACKGROUND);
+        clearCanvas();
+        double centerX = WIDTH / 2.0 + XOFFSET;
+        double centerY = HEIGHT / 2.0  + YOFFSET;
         StdDraw.setPenColor(TEXTCOLOR);
         StdDraw.setFont(new Font("Monaco", Font.BOLD, 60));
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 + 8, "CS61B: THE GAME");
+        StdDraw.text(centerX, centerY + 8, "CS61B: THE GAME");
         StdDraw.setFont(INITINFOFONT);
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 + 2, "New Game (N)");
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, "Load Game (L)");
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0 - 2, "Quit (Q)");
+        StdDraw.text(centerX, centerY + 2, "New Game (N)");
+        StdDraw.text(centerX, centerY, "Load Game (L)");
+        StdDraw.text(centerX, centerY - 2, "Quit (Q)");
         StdDraw.show();
     }
     private void drawInitInfo(String info, int ms) {
-        clearInitInfo();
+        clearCanvas();
         StdDraw.setFont(INITINFOFONT);
         StdDraw.setPenColor(TEXTCOLOR);
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, info);
+        StdDraw.text(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, info);
         StdDraw.show(ms);
-        clearInitInfo();
+        clearCanvas();
     }
-    private void clearInitInfo() {
-        clearMessageHelper(WIDTH / 2.0, HEIGHT / 2.0, 25, 2);
-    }
-    private void clearMenu() {
-        StdDraw.clear(BACKGROUND);
+    private void clearMap() {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, WIDTH / 2.0, HEIGHT / 2.0);
         StdDraw.show();
     }
+    // draw message shown in the center
     private void drawInitInfo(String info) {
-        clearInitInfo();
+        clearCanvas();
         StdDraw.setFont(INITINFOFONT);
         StdDraw.setPenColor(TEXTCOLOR);
-        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, info);
+        StdDraw.text(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, info);
         StdDraw.show();
     }
 
@@ -565,9 +665,10 @@ public class Engine {
         // initiate or retrieve random and world map
         String[] info = getInfo(input);
         TETile[][] finalWorldFrame;
-        ter.initialize(WIDTH + XDOWNSET, HEIGHT + YDOWNSET);
+        initializeCanvas();
         if (!info[0].isEmpty()) {
             if (!hasSavedGame()) {
+                drawInitInfo("No previous game can be loaded!", 1000);
                 return null;
             } else {
                 finalWorldFrame = getSavedGame();
@@ -580,7 +681,7 @@ public class Engine {
             renderFrame(finalWorldFrame);
             StdDraw.pause(500);
         }
-        // for each action, move the player in the direction
+        // for each action, move the avatar in the direction
         if (!info[2].isEmpty()) {
             for (int i = 0; i < info[2].length(); i++) {
                 if (move(finalWorldFrame, info[2].charAt(i))) {
@@ -610,7 +711,7 @@ public class Engine {
         } else if (c == 'D') {
             dx = 1;
         }
-        Position nextPos = new Position(player.x + dx, player.y + dy);
+        Position nextPos = new Position(avatar.x + dx, avatar.y + dy);
         // if next tile is wall
         if (finalWorldFrame[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
             return false;
@@ -626,7 +727,7 @@ public class Engine {
                 if (lives <= 0) {
                     // game is over, flash the message "Game Over!"
                     flashMessage("Game Over!", 1000);
-                    StdDraw.clear(BACKGROUND);
+                    clearMap();
                     drawInitInfo("Game Over!", 2000);
                     return true;
                 }
@@ -635,18 +736,26 @@ public class Engine {
             }
         }
         // deal with treasure
-        for (Position treasure: treasures) {
-            if (nextPos.equal(treasure)) {
-                openTreasure(treasure);
+        for (int i = 0; i < treasures.size(); i++) {
+            if (nextPos.equal(treasures.get(i))) {
+                openTreasure(treasures.get(i));
+                finalWorldFrame[nextPos.x][nextPos.y] = Tileset.WATER;
+                treasures.set(i, treasures.get(treasures.size() - 1));
+                treasures.remove(treasures.size() - 1);
             }
         }
+
         // update world map
         StdDraw.setFont(TILEFONT);
-        finalWorldFrame[player.x][player.y] = Tileset.FLOOR;
-        finalWorldFrame[player.x][player.y].draw(player.x, player.y);
-        player = nextPos;
-        finalWorldFrame[player.x][player.y] = Tileset.AVATAR;
-        finalWorldFrame[player.x][player.y].draw(player.x, player.y);
+        finalWorldFrame[avatar.x][avatar.y] = tileUnderAvatar;
+        drawTile(finalWorldFrame, avatar.x, avatar.y);
+        avatar = nextPos;
+        tileUnderAvatar = finalWorldFrame[avatar.x][avatar.y];
+        finalWorldFrame[avatar.x][avatar.y] = Tileset.AVATAR;
+        drawTile(finalWorldFrame, avatar.x, avatar.y);
+        if (avatarSightOnly) {
+            renderAvatarSightOnly(finalWorldFrame);
+        }
         StdDraw.show();
         return false;
 //        renderFrame(finalWorldFrame);
@@ -665,19 +774,11 @@ public class Engine {
         clearMessage();
         StdDraw.setFont(MESSAGEFONT);
         StdDraw.setPenColor(TEXTCOLOR);
-        StdDraw.text(WIDTH / 2.0, livesPosStart.y, message);
+        StdDraw.text(WIDTH / 2.0 + XOFFSET, YOFFSET + HEIGHT + YDOWNSET / 2.0, message);
     }
     public void clearMessage() {
-        clearMessageHelper(WIDTH / 2.0, livesPosStart.y, 30,1);
-    }
-    public void clearMessageHelper(double centerX, double centerY, double halfWidth, double halfHeight) {
         StdDraw.setPenColor(BACKGROUND);
-        StdDraw.filledRectangle(centerX, centerY, halfWidth, halfHeight);
-//        int messageSize = 20;
-//        for (int i = 0; i < messageSize; i++) {
-//            Tileset.NOTHING.draw(WIDTH / 2 - 10 + i, livesPosStart.y);
-//            Tileset.NOTHING.draw(WIDTH / 2 - 10 + i, livesPosStart.y - 1);
-//        }
+        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, YOFFSET + HEIGHT + YDOWNSET / 2.0, 30, 1);
         StdDraw.show();
     }
 
@@ -688,7 +789,7 @@ public class Engine {
 
     private void deadOnce() {
         drawMessage("Dead Once!");
-        flashTile(player, Tileset.AVATAR, 1000, 200);
+        flashTile(avatar, Tileset.AVATAR, 1000, 200);
         removeLiveOnce();
         clearMessage();
     }
@@ -697,10 +798,10 @@ public class Engine {
     private void flashTile(Position pos, TETile tile, int flashTime, int flashBreak) {
         StdDraw.setFont(TILEFONT);
         while (flashTime >= 0) {
-            Tileset.NOTHING.draw(pos.x, pos.y);
+            Tileset.NOTHING.draw(pos.x + XOFFSET, pos.y + YOFFSET);
             StdDraw.show();
             StdDraw.pause(flashBreak);
-            tile.draw(pos.x, pos.y);
+            tile.draw(pos.x + XOFFSET, pos.y + YOFFSET);
             StdDraw.show();
             StdDraw.pause(flashBreak);
             flashTime -= flashBreak;
@@ -708,10 +809,10 @@ public class Engine {
     }
 
     private void congratulations(TETile[][] finalWorldFrame) {
-        finalWorldFrame[player.x][player.y] = Tileset.FLOOR;
-        finalWorldFrame[player.x][player.y].draw(player.x, player.y);
+        finalWorldFrame[avatar.x][avatar.y] = tileUnderAvatar;
+        drawTile(finalWorldFrame, avatar.x, avatar.y);
         finalWorldFrame[door.x][door.y] = Tileset.UNLOCKED_DOOR;
-        finalWorldFrame[door.x][door.y].draw(door.x, door.y);
+        drawTile(finalWorldFrame, door.x, door.y);
         flashMessage("Congratulations!", 1000);
         StdDraw.show();
     }

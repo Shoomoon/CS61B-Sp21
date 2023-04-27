@@ -71,6 +71,12 @@ public class TETile implements Serializable {
         this(t.character, textColor, t.backgroundColor, t.description, t.filepath);
     }
 
+    /**
+     * Creates a copy of the given tile with new background color.
+     * */
+    public TETile changeBackgroundColor(Color bgColor) {
+        return new TETile(this.character, this.textColor, bgColor, this.description, this.filepath);
+    }
 
     /**
      * Draws the tile to the screen at location x, y. If a valid filepath is provided,
@@ -97,6 +103,9 @@ public class TETile implements Serializable {
         StdDraw.filledSquare(x + 0.5, y + 0.5, 0.5);
         StdDraw.setPenColor(textColor);
         StdDraw.text(x + 0.5, y + 0.5, Character.toString(character()));
+    }
+    public Color getBackgroundColor() {
+        return this.backgroundColor;
     }
 
     /** Character representation of the tile. Used for drawing in text mode.
@@ -191,6 +200,6 @@ public class TETile implements Serializable {
         return copy;
     }
     public boolean equal(TETile tile) {
-        return character == tile.character;
+        return description.equals(tile.description());
     }
 }

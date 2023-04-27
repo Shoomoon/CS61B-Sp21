@@ -2,26 +2,53 @@ package byow.Core;
 
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
+import edu.princeton.cs.introcs.StdDraw;
 
+import java.awt.*;
+import java.io.Serializable;
 import java.util.Random;
 
-public class Room {
+public class Room implements Serializable {
     private final int x;
     private final int y;
     private final int width;
     private final int height;
+    private Position light;
+    private final boolean hasLight;
+    private static final int LIGHTRANGE = 6;
+    public static final Color LIGHTCOLOR = new Color(62, 78, 240);
+    public static final double BASE = 0.78;
+    private boolean enableLight = false;
+    public static final Font TILEFONT = Engine.TILEFONT;
+    // generate a room with light
+    public Room(int i, int j, int w, int h, Position light) {
+        this.x = i;
+        this.y = j;
+        this.width = w;
+        this.height = h;
+        this.light = light;
+        this.hasLight = true;
+    }
+    // generate a room without light, for example hallways
     public Room(int i, int j, int w, int h) {
         this.x = i;
         this.y = j;
         this.width = w;
         this.height = h;
+        this.hasLight = false;
     }
     public void createRoom(TETile[][] tiles) {
-        // draw floor
+        // draw floor, and don't rewrite light
         for (int dx = 0; dx < width; dx++) {
             for (int dy = 0; dy < height; dy++) {
-                tiles[x + dx][y + dy] = Tileset.FLOOR;
+                if (tiles[x + dx][y + dy].equal(Tileset.NOTHING) || tiles[x + dx][y + dy].equal(Tileset.WALL)) {
+                    tiles[x + dx][y + dy] = Tileset.FLOOR;
+                }
             }
+        }
+        // draw light
+        if (hasLight) {
+            tiles[light.x][light.y] = Tileset.LIGHT;
         }
         //draw horizontal walls
         for (int dx = -1; dx <= width; dx++) {
@@ -39,6 +66,59 @@ public class Room {
             }
             if (tiles[x + width][y + dy].equal(Tileset.NOTHING)) {
                 tiles[x + width][y + dy] = Tileset.WALL;
+            }
+        }
+        toggleLight(tiles);
+    }
+    public void toggleLight(TETile[][] tiles) {
+        if (!hasLight) {
+            return;
+        }
+        this.enableLight = !this.enableLight;
+        int l = Math.max(x, light.x - LIGHTRANGE);
+        int r = Math.min(x + width, light.x + LIGHTRANGE + 1);
+        int b = Math.max(y, light.y - LIGHTRANGE);
+        int t = Math.min(y + height, light.y + LIGHTRANGE + 1);
+        for (int i = l; i < r; i++) {
+            for (int j = b; j < t; j++) {
+                int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
+                // don't change back color if it is not floor or light
+                if (d != 0 && !tiles[i][j].equal(Tileset.FLOOR)) {
+                    continue;
+                }
+                if (enableLight) {
+                    double factor = Math.pow(BASE, d);
+                    int redVal = (int) (LIGHTCOLOR.getRed() * factor);
+                    int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);
+                    int blueVal =  (int) (LIGHTCOLOR.getBlue() * factor);
+                    tiles[i][j] = tiles[i][j].changeBackgroundColor(new Color(redVal, greenVal, blueVal));
+                } else {
+                    tiles[i][j] = tiles[i][j].changeBackgroundColor(Engine.BACKGROUND);
+                }
+            }
+        }
+    }
+    public void toggleLight(TETile[][] tiles, boolean lightOn) {
+        if (!hasLight || this.enableLight == lightOn) {
+            return;
+        }
+        this.enableLight = lightOn;
+        int l = Math.max(x, light.x - LIGHTRANGE);
+        int r = Math.min(x + width, light.x + LIGHTRANGE + 1);
+        int b = Math.max(y, light.y - LIGHTRANGE);
+        int t = Math.min(y + height, light.y + LIGHTRANGE + 1);
+        for (int i = l; i < r; i++) {
+            for (int j = b; j < t; j++) {
+                if (enableLight) {
+                    int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
+                    double factor = Math.pow(BASE, d);
+                    int redVal = (int) (LIGHTCOLOR.getRed() * factor);
+                    int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);
+                    int blueVal =  (int) (LIGHTCOLOR.getBlue() * factor);
+                    tiles[i][j] = tiles[i][j].changeBackgroundColor(new Color(redVal, greenVal, blueVal));
+                } else {
+                    tiles[i][j] = tiles[i][j].changeBackgroundColor(Engine.BACKGROUND);
+                }
             }
         }
     }
@@ -100,5 +180,20 @@ public class Room {
         Room hallwayVertical = new Room(xHorHallway, yVerHallway, Math.min(Engine.WIDTH - xHorHallway - 1, hallwayWidth), heightVerHallway);
         hallwayHorizontal.createRoom(tiles);
         hallwayVertical.createRoom(tiles);
+    }
+    public int getX() {
+        return x;
+    }
+    public int getY() {
+        return y;
+    }
+    public int getWidth() {
+        return width;
+    }
+    public int getHeight() {
+        return height;
+    }
+    public Position getLight() {
+        return light;
     }
 }

@@ -28,22 +28,22 @@ public class RoomTest {
     }
     @Test
     public void drawRoomTest() {
-        Room room = new Room(2, 2, 4, 4);
+        Room room = new Room(2, 2, 4, 4, new Position(2, 2));
         room.createRoom(tiles);
         ter.renderFrame(tiles);
 
-        Room room1 = new Room(3, 4, 5, 8);
+        Room room1 = new Room(3, 4, 5, 8, new Position(3, 4));
         room1.createRoom(tiles);
         ter.renderFrame(tiles);
 
-        Room room2 = new Room(3, 18, 4, 4);
+        Room room2 = new Room(3, 18, 4, 4, new Position(3, 18));
         room2.createRoom(tiles);
         ter.renderFrame(tiles);
 
         room2.connectWithRoom(tiles, random, room1);
         ter.renderFrame(tiles);
 
-        Room room3 = new Room(30, 26, 8, 8);
+        Room room3 = new Room(30, 26, 8, 8, new Position(30, 26));
         room3.createRoom(tiles);
         room3.connectWithRoom(tiles, random, room2);
         ter.renderFrame(tiles);
@@ -51,21 +51,21 @@ public class RoomTest {
 
     @Test
     public void distanceTest() {
-        Room r1 = new Room(2, 2, 2, 2);
+        Room r1 = new Room(2, 2, 2, 2, new Position(2, 2));
 
-        Room r2 = new Room(4, 4, 2, 2);
+        Room r2 = new Room(4, 4, 2, 2, new Position(4, 4));
         assertEquals(r1.distance(r2), 2);
 
-        Room r3 = new Room(4, 4, 3,3 );
+        Room r3 = new Room(4, 4, 3,3, new Position(4, 4));
         assertEquals(r1.distance(r3), 2);
 
-        Room r4 = new Room(4, 3, 2, 2);
+        Room r4 = new Room(4, 3, 2, 2, new Position(4, 3));
         assertEquals(r1.distance(r4), -1);
 
-        Room r5 = new Room(3, 4, 2, 2);
+        Room r5 = new Room(3, 4, 2, 2, new Position(4, 2));
         assertEquals(r1.distance(r5), -1);
 
-        Room r6 = new Room(5, 4, 2, 2);
+        Room r6 = new Room(5, 4, 2, 2, new Position(5, 4));
         assertEquals(r1.distance(r6), 3);
     }
 }
