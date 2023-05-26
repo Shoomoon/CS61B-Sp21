@@ -31,7 +31,7 @@ public class EngineTest {
     }
     @Test
     public void showTest() {
-        engine.fillTileWorldWithNothing(world);
+        engine.fillTileWorldWithNothing();
         engine.ter.initialize(Engine.WIDTH, Engine.HEIGHT);
         StdDraw.setFont(Engine.MESSAGEFONT);
         StdDraw.setPenColor(Color.WHITE);
@@ -64,15 +64,15 @@ public class EngineTest {
         world = new TETile[1][1];
         world[0][0] = Tileset.WALL;
         engine.random = new Random(100);
-        engine.saveGame(world);
+        engine.saveGame();
         Random r = new Random(100);
         for (int i = 0; i < 100; i++) {
             // switch random.nextInt = 0: save and reload
             // 1: nextInt;
             if (engine.random.nextInt(2) == 0) {
                 r.nextInt(2);
-                engine.saveGame(world);
-                world = engine.getSavedGame();
+                engine.saveGame();
+                world = engine.getWorld();
                 assertEquals(world.length, 1);
                 assertEquals(world[0].length, 1);
                 assertEquals(world[0][0].character(), '#');
@@ -135,8 +135,8 @@ public class EngineTest {
 
         engine.random = new Random(100);
         engine.random.nextInt(1546);
-        engine.fillTileWorldWithNothing(world);
-        engine.saveGame(world);
+        engine.fillTileWorldWithNothing();
+        engine.saveGame();
 
         String arg12 = "LWASD:Q";
         assertDoesNotThrow(() -> engine.getInfo(arg12));
