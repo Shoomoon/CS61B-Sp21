@@ -91,7 +91,6 @@ public class Engine {
     public void showMovableItems() {
         // display all movable items: Avatar, treasures, guardians
         // display avatar
-        StdDraw.setFont(TILEFONT);
         drawTile(Tileset.AVATAR, avatar);
         // display treasures
         for (Position t: treasures) {
@@ -155,6 +154,9 @@ public class Engine {
         showMovableItems();
     }
     private void drawTile(int i, int j) {
+        if (i < 0 || i >= WIDTH || j < 0 || j >= HEIGHT) {
+            return;
+        }
         drawTile(world[i][j], i, j);
     }
     private void drawLives() {
@@ -403,7 +405,7 @@ public class Engine {
         if (arg == null || arg.isEmpty()) {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
-        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq]？).*$";
+        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq]?).*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
@@ -692,7 +694,12 @@ public class Engine {
         // for each action, move the avatar in the direction
         if (!info[2].isEmpty()) {
             for (int i = 0; i < info[2].length(); i++) {
-                if (move(info[2].charAt(i))) {
+                char c = Character.toUpperCase(info[2].charAt(i));
+                if (c == 'G') {
+                    randomToggleLight();
+                } else if (c == 'H') {
+                    toggleAvatarSight();
+                } else if (move(c)) {
                     return world;
                 }
                 StdDraw.pause(500);
@@ -798,7 +805,7 @@ public class Engine {
 
     private void meetItem(Position p, TETile tile, String s) {
         drawMessage(s);
-        flashTile(p, tile, 1000, 200);
+        flashTile(p, tile, 600, 200);
         clearMessage();
     }
 
