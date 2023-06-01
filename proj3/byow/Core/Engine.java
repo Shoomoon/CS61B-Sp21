@@ -7,7 +7,6 @@ import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.*;
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -42,17 +41,8 @@ public class Engine {
     public static final Font INSTRUCTIONFONT = new Font("Monaco", Font.BOLD, 16);
     // The directory to store world maps and variables
     public static final File BLOBS = new File(System.getProperty("user.dir"), ".maps");
-    public static final File RANDOM = new File(BLOBS, "random.txt");
-    public static final File WORLD = new File(BLOBS, "world.txt");
-    public static final File AVATAR = new File(BLOBS, "avatar.txt");
-    public static final File DOOR = new File(BLOBS, "door.txt");
-    public static final File GUARDIANS = new File(BLOBS, "guardians.txt");
-    public static final File TREASURES = new File(BLOBS, "treasures.txt");
-    private static final File ROOMSLIST = new File(BLOBS, "roomsList.txt");
-    private static final File LIVES = new File(BLOBS, "lives.txt");
-    private static final File AVATARSIGHTONLY = new File(BLOBS, "avatarSightOnly.txt");
-    private static final File TILEUNDERAVATAR = new File(BLOBS, "tileUnderAvatar");
-    public static final Position livesPosStart = new Position(2, HEIGHT + YDOWNSET / 2 + YOFFSET);
+    public static final File SAVEDGAME = new File(BLOBS, "savedGame.txt");
+    public static final Position livesPosStart = new Position(2, HEIGHT + YOFFSET + YDOWNSET / 2);
     public static final Color BACKGROUND = Color.BLACK;
     public static final Color TEXTCOLOR = Color.WHITE;
     //maximum treasures
@@ -62,12 +52,14 @@ public class Engine {
     // maximum initial lives
     public static final int MAXINITLIVES = 3;
     public static final int SIGHTRANGE = 6;
+    public static final Position MESSAGEPOS = new Position(WIDTH / 2 + XOFFSET, HEIGHT + YDOWNSET / 2 + YOFFSET);
+    public static final Position INSTRUCTIONPOS = new Position(WIDTH / 2 + XOFFSET, YOFFSET / 2);
+    private TETile[][] world;
     private Position avatar;
     private Position door;
-    private ArrayList<Position> treasures;
-    private ArrayList<Position> guardians;
-    private TETile tileUnderAvatar;
-    private ArrayList<Room> roomsList;
+    private List<Position> treasures;
+    private List<Position> guardians;
+    private List<Room> roomsList;
     private Integer lives;
     // Turn lights on or off, toggled with key 'H'
     private Boolean avatarSightOnly = false;
@@ -75,7 +67,7 @@ public class Engine {
 
     public void main(String[] args) {
         Engine engine = new Engine();
-        TETile[][] tiles = engine.interactWithInputString(args[0]);
+        world = engine.interactWithInputString(args[0]);
     }
     public Engine() {
         if (!BLOBS.exists()) {
@@ -83,59 +75,87 @@ public class Engine {
         }
         lives = MAXINITLIVES;
     }
-    public void renderFrame(TETile[][] tiles) {
+    public void renderFrame() {
         clearCanvas();
         StdDraw.setFont(TILEFONT);
         if (!avatarSightOnly) {
-            ter.renderFrame(tiles);
+            ter.renderFrame(world);
+            showMovableItems();
         } else {
-            renderAvatarSightOnly(tiles);
+            renderAvatarSightOnly();
         }
         drawLives();
-        drawInstructions();
+        drawInstruction();
         StdDraw.show();
     }
-
-    private void drawInstructions() {
-        drawInstructions("Up(W) Down(S) Left(A) Right(D) Save & Quit(:Q) New Game(N) Randomly Toggle Light(G) Toggle Avatar Sight(H)");
+    public void showMovableItems() {
+        // display all movable items: Avatar, treasures, guardians
+        // display avatar
+        StdDraw.setFont(TILEFONT);
+        drawTile(Tileset.AVATAR, avatar);
+        // display treasures
+        for (Position t: treasures) {
+            if (!avatarSightOnly || inAvatarSight(t)) {
+                drawTile(Tileset.TREASURE, t);
+            }
+        }
+        // display guardians
+        for (Position g: guardians) {
+            if (!avatarSightOnly || inAvatarSight(g)) {
+                drawTile(Tileset.GUARDIAN, g);
+            }
+        }
     }
-    private void drawInstructions(String s) {
-        StdDraw.setPenColor(BACKGROUND);
-        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, YOFFSET / 2.0, WIDTH / 2.0, YOFFSET / 2.0);
+    public void drawTile(TETile tile, Position p) {
+        drawTile(tile, p.x, p.y);
+    }
+    public void drawTile(TETile tile, int x, int y) {
+        StdDraw.setFont(TILEFONT);
+        tile.draw(x + XOFFSET, y + YOFFSET);
+    }
+    private boolean inAvatarSight(Position p) {
+        int d = Math.abs(p.x - avatar.x) + Math.abs(p.y - avatar.y);
+        return d <= SIGHTRANGE;
+    }
+
+    private void drawInstruction() {
+        drawInstruction("Up(W) Down(S) Left(A) Right(D) Save & Quit(:Q) New Game(N) Randomly Toggle Light(G) Toggle Avatar Sight(H)");
+    }
+    private void drawInstruction(String s) {
+        clearInstruction();
         StdDraw.setFont(INSTRUCTIONFONT);
         StdDraw.setPenColor(TEXTCOLOR);
         StdDraw.text(WIDTH / 2.0 + XOFFSET, YOFFSET / 2.0, s);
     }
 
-    public void renderRoom(TETile[][] tiles, Room room) {
-        StdDraw.setFont(TILEFONT);
+    public void renderRoom(Room room) {
         int x = room.getX();
         int y = room.getY();
         int w = room.getWidth();
         int h = room.getHeight();
-        for (int i = 0; i < w; i++) {
-            for (int j = 0; j < h; j++) {
-                int distance = Math.max(Math.abs(x + i - avatar.x), Math.abs(y + j - avatar.y));
+        for (int i = -1; i <= w; i++) {
+            for (int j = -1; j <= h; j++) {
+                int distance = Math.abs(x + i - avatar.x) + Math.abs(y + j - avatar.y);
                 if (!avatarSightOnly || distance <= SIGHTRANGE) {
-                    drawTile(tiles, x + i, y + j);
+                    drawTile(x + i, y + j);
                 }
             }
         }
+        showMovableItems();
         StdDraw.show();
     }
-    private void renderAvatarSightOnly(TETile[][] tiles) {
+    private void renderAvatarSightOnly() {
         clearMap();
         for (int d = SIGHTRANGE; d >= 0; d--) {
             for (int i = d - SIGHTRANGE; i <= SIGHTRANGE - d; i++) {
-                drawTile(tiles, avatar.x + i, avatar.y + d);
-                drawTile(tiles, avatar.x + i, avatar.y - d);
+                drawTile(avatar.x + i, avatar.y + d);
+                drawTile(avatar.x + i, avatar.y - d);
             }
         }
+        showMovableItems();
     }
-    private void drawTile(TETile[][] tiles, int i, int j) {
-        if (i >= 0 && i < WIDTH && j >= 0 && j < HEIGHT) {
-            tiles[i][j].draw(i + XOFFSET, j + YOFFSET);
-        }
+    private void drawTile(int i, int j) {
+        drawTile(world[i][j], i, j);
     }
     private void drawLives() {
         StdDraw.setFont(TILEFONT);
@@ -156,26 +176,25 @@ public class Engine {
         lives += 1;
         StdDraw.show();
     }
-    private void randomGenerateWorld(TETile[][] tiles) {
+    private void randomGenerateWorld() {
         // random generate world map
-        fillTileWorldWithNothing(tiles);
         roomsList = new ArrayList<>();
         // random generate rooms and randomly connect to previous room
         for (int i = 1; i < WIDTH - 1; i++) {
             for (int j = 1; j < HEIGHT - 1; j++) {
-                if (tiles[i][j].equal(Tileset.NOTHING) && isRoom(i, j)) {
+                if (world[i][j].equal(Tileset.NOTHING) && isRoom(i, j)) {
                     Room room = generateRoomAt(i, j);
                     if (room == null) {
                         continue;
                     }
-                    room.createRoom(tiles);
+                    room.createRoom(world);
 //                    ter.renderFrame(tiles);
                     // choose the nearest room and connect to it via hallway, and do nothing if has overlap
                     List<Room> connectRoomsCandidates = nearest2Rooms(room);
-                    room.connectWithRoom(tiles, random, connectRoomsCandidates.get(0));
+                    room.connectWithRoom(world, random, connectRoomsCandidates.get(0));
                     // randomly connect to the 2nd nearest room
                     if (RandomUtils.uniform(random) < CONNECTROOMPROBABILITY) {
-                        room.connectWithRoom(tiles, random, connectRoomsCandidates.get(1));
+                        room.connectWithRoom(world, random, connectRoomsCandidates.get(1));
                     }
 
 //                    Room connectRoom = nearestRoom(room, rooms);
@@ -189,41 +208,36 @@ public class Engine {
                 }
             }
         }
+        // random generate avatar, treasures and guardians
+        int treasuresCount = RandomUtils.uniform(random, 1, MAXTREASURES + 1);
+        int guardiansCount = RandomUtils.uniform(random, 1, MAXGUARDIANS + 1);
+        List<Position> items = randomGenerateMultiPos(1 + treasuresCount + guardiansCount);
+        avatar = items.get(0);
+        treasures = new ArrayList<>(items.subList(1, treasuresCount + 1));
+        guardians = new ArrayList<>(items.subList(treasuresCount + 1, 1 + treasuresCount + guardiansCount));
 
-        // random generate avatar
-        avatar = randomGenerateMultiPos(tiles, 1, 1).get(0);
-        tileUnderAvatar = tiles[avatar.x][avatar.y];
-        tiles[avatar.x][avatar.y] = Tileset.AVATAR;
         // random outgoing door
-        door = randomGenerateDoor(tiles);
-        // random treasures
-        treasures = randomGenerateMultiPos(tiles, 1, MAXTREASURES);
-        for (Position treasure: treasures) {
-            tiles[treasure.x][treasure.y] = Tileset.TREASURE;
-        }
-        // random generate guardians
-        guardians = randomGenerateMultiPos(tiles, 1, MAXGUARDIANS);
-        for (Position guardian: guardians) {
-            tiles[guardian.x][guardian.y] = Tileset.GUARDIAN;
-        }
+        door = randomGenerateDoor();
+
         avatarSightOnly = false;
     }
 
-    private ArrayList<Position> randomGenerateMultiPos(TETile[][] tiles, int minCount, int maxCount) {
-        int size = RandomUtils.uniform(random, minCount, maxCount + 1);
-        ArrayList<Position> res = new ArrayList<>();
+    private List<Position> randomGenerateMultiPos(int size) {
+        // uniformly select size arraylist from tiles
+        List<Position> res = new ArrayList<>();
         int floorCount = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[0].length; j++) {
-                if (tiles[i][j].equal(Tileset.FLOOR)) {
+        for (int i = 0; i < world.length; i++) {
+            for (int j = 0; j < world[0].length; j++) {
+                if (world[i][j].equal(Tileset.FLOOR)) {
                     floorCount += 1;
+                    int k = RandomUtils.uniform(random, floorCount);
                     if (floorCount <= size) {
                         res.add(new Position(i, j));
-                    } else {
-                        int k = RandomUtils.uniform(random, floorCount);
-                        if (k < size) {
-                            res.set(k, new Position(i, j));
-                        }
+                        Position tmp = res.get(k);
+                        res.set(k, res.get(floorCount - 1));
+                        res.set(floorCount - 1, tmp);
+                    } else if (k < size) {
+                        res.set(k, new Position(i, j));
                     }
                 }
             }
@@ -231,13 +245,13 @@ public class Engine {
         return res;
     }
 
-    private Position randomGenerateDoor(TETile[][] tiles) {
+    private Position randomGenerateDoor() {
         int count = 0;
         int x = 0;
         int y = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[0].length; j++) {
-                if (validDoor(tiles, i, j)) {
+        for (int i = 0; i < world.length; i++) {
+            for (int j = 0; j < world[0].length; j++) {
+                if (validDoor(i, j)) {
                     count += 1;
                     if (RandomUtils.uniform(random, count) == 0) {
                         x = i;
@@ -246,31 +260,34 @@ public class Engine {
                 }
             }
         }
-        tiles[x][y] = Tileset.LOCKED_DOOR;
+        world[x][y] = Tileset.LOCKED_DOOR;
         return new Position(x, y);
     }
+    public TETile[][] getWorld() {
+        return world;
+    }
 
-    private boolean validDoor(TETile[][] tiles, int i, int j) {
+    private boolean validDoor(int i, int j) {
 //        if (i < 0 || i >= tiles.length || j < 0 || j >= tiles[0].length) {
 //            throw new IllegalArgumentException("Inaccessible position!");
 //        }
-        if (!tiles[i][j].equal(Tileset.WALL)) {
+        if (!world[i][j].equal(Tileset.WALL)) {
             return false;
         }
         // from down tile
-        if ((j + 1 == tiles[0].length || tiles[i][j + 1].equal(Tileset.NOTHING)) && j > 0 && tiles[i][j - 1].equal(Tileset.FLOOR)) {
+        if ((j + 1 == world[0].length || world[i][j + 1].equal(Tileset.NOTHING)) && j > 0 && world[i][j - 1].equal(Tileset.FLOOR)) {
             return true;
         }
         // from up tile
-        if ((j == 0 || tiles[i][j - 1].equal(Tileset.NOTHING)) && j + 1 < tiles[0].length && tiles[i][j + 1].equal(Tileset.FLOOR)) {
+        if ((j == 0 || world[i][j - 1].equal(Tileset.NOTHING)) && j + 1 < world[0].length && world[i][j + 1].equal(Tileset.FLOOR)) {
             return true;
         }
         // from right tile
-        if ((i == 0 || tiles[i - 1][j].equal(Tileset.NOTHING)) && i + 1 < tiles.length && tiles[i + 1][j].equal(Tileset.FLOOR)) {
+        if ((i == 0 || world[i - 1][j].equal(Tileset.NOTHING)) && i + 1 < world.length && world[i + 1][j].equal(Tileset.FLOOR)) {
             return true;
         }
         // from left tile
-        return (i + 1 == tiles.length || tiles[i + 1][j].equal(Tileset.NOTHING)) && i > 0 && tiles[i - 1][j].equal(Tileset.FLOOR);
+        return (i + 1 == world.length || world[i + 1][j].equal(Tileset.NOTHING)) && i > 0 && world[i - 1][j].equal(Tileset.FLOOR);
     }
     // select the 2 nearest rooms
     // if there are more than 2 rooms, uniformly select any of them
@@ -373,10 +390,10 @@ public class Engine {
         return WIDTH - i >= MINROOMWIDTH + 1 && HEIGHT - j >= MINROOMHEIGHT + 1 && RandomUtils.uniform(random) < ROOMPROBABILITY;
     }
 
-    public void fillTileWorldWithNothing(TETile[][] tiles) {
+    public void fillTileWorldWithNothing() {
         for (int i = 0; i < WIDTH; i++) {
             for (int j = 0; j < HEIGHT; j++) {
-                tiles[i][j] = Tileset.NOTHING;
+                world[i][j] = Tileset.NOTHING;
             }
         }
     }
@@ -386,7 +403,7 @@ public class Engine {
         if (arg == null || arg.isEmpty()) {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
-        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq])?.*$";
+        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq]？).*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
@@ -405,69 +422,30 @@ public class Engine {
         return new String[]{load, inputSeed, actions, end};
     }
     public void clearRecord() {
-        if (WORLD.exists()) {
-            WORLD.delete();
-        }
-        if (RANDOM.exists()) {
-            RANDOM.delete();
-        }
-        if (AVATAR.exists()) {
-            AVATAR.delete();
-        }
-        if (DOOR.exists()) {
-            DOOR.delete();
-        }
-        if (TREASURES.exists()) {
-            TREASURES.delete();
-        }
-        if (GUARDIANS.exists()) {
-            GUARDIANS.delete();
-        }
-        if (ROOMSLIST.exists()) {
-            ROOMSLIST.delete();
-        }
-        if (LIVES.exists()) {
-            LIVES.delete();
-        }
-        if (AVATARSIGHTONLY.exists()) {
-            AVATARSIGHTONLY.delete();
-        }
-        if (TILEUNDERAVATAR.exists()) {
-            TILEUNDERAVATAR.delete();
+        if (SAVEDGAME.exists()) {
+            SAVEDGAME.delete();
         }
     }
     public boolean hasSavedGame() {
-        return WORLD.exists() && RANDOM.exists()
-                && AVATAR.exists() && DOOR.exists()
-                && TREASURES.exists() && GUARDIANS.exists()
-                && ROOMSLIST.exists() && LIVES.exists()
-                && AVATARSIGHTONLY.exists() && TILEUNDERAVATAR.exists();
+        return SAVEDGAME.exists();
     }
 
-    public void saveGame(TETile[][] world) {
-        Utiles.writeObject(WORLD, world);
-        Utiles.writeObject(RANDOM, random);
-        Utiles.writeObject(AVATAR, avatar);
-        Utiles.writeObject(DOOR, door);
-        Utiles.writeObject(GUARDIANS, (Serializable) guardians);
-        Utiles.writeObject(TREASURES, (Serializable) treasures);
-        Utiles.writeObject(ROOMSLIST, (Serializable) roomsList);
-        Utiles.writeObject(LIVES, lives);
-        Utiles.writeObject(AVATARSIGHTONLY, avatarSightOnly);
-        Utiles.writeObject(TILEUNDERAVATAR, tileUnderAvatar);
+    public void saveGame() {
+        Record currentGame = new Record(world, random, avatar, door, treasures, guardians, roomsList, lives, avatarSightOnly);
+        Utiles.writeObject(SAVEDGAME, currentGame);
     }
 
-    public TETile[][] getSavedGame() {
-        random = Utiles.readObject(RANDOM, Random.class);
-        avatar = Utiles.readObject(AVATAR, Position.class);
-        door = Utiles.readObject(DOOR, Position.class);
-        guardians = Utiles.readObject(GUARDIANS, ArrayList.class);
-        treasures = Utiles.readObject(TREASURES, ArrayList.class);
-        roomsList = Utiles.readObject(ROOMSLIST, ArrayList.class);
-        lives = Utiles.readObject(LIVES, Integer.class);
-        avatarSightOnly = Utiles.readObject(AVATARSIGHTONLY, Boolean.class);
-        tileUnderAvatar = Utiles.readObject(TILEUNDERAVATAR, TETile.class);
-        return Utiles.readObject(WORLD, TETile[][].class);
+    public void getSavedGame() {
+        Record savedGame = Utiles.readObject(SAVEDGAME, Record.class);
+        world = savedGame.getWorld();
+        random = savedGame.getRandom();
+        avatar = savedGame.getAvatar();
+        door = savedGame.getDoor();
+        guardians = savedGame.getGuardians();
+        treasures = savedGame.getTreasures();
+        roomsList = savedGame.getRoomsList();
+        lives = savedGame.getLives();
+        avatarSightOnly = savedGame.getAvatarSightOnly();
     }
 
     private void initializeCanvas() {
@@ -482,94 +460,109 @@ public class Engine {
      */
     public void interactWithKeyboard() {
         initializeCanvas();
-        TETile[][] finalWorldFrame = new TETile[WIDTH][HEIGHT];
+        world = new TETile[WIDTH][HEIGHT];
+        fillTileWorldWithNothing();
         boolean worldInitialized = false;
         drawMenu();
         while (true) {
             char c = Character.toUpperCase(getNextKeyTyped());
             if (c == 'L') {
-                if (!hasSavedGame()) {
-                    drawInitInfo("No previous game can be loaded!", 1000);
-                    continue;
+                if (worldInitialized) {
+                    drawMessage(String.valueOf(c), 500);
+                    if (!hasSavedGame()) {
+                        drawMessage("No previous game can be loaded!", 1000);
+                        continue;
+                    }
+                } else {
+                    drawInitInfo(String.valueOf(c), 500);
+                    if (!hasSavedGame()) {
+                        drawInitInfo("No previous game can be loaded!", 1000);
+                        continue;
+                    }
                 }
-                drawInitInfo(String.valueOf(c), 500);
-                finalWorldFrame = getSavedGame();
-                renderFrame(finalWorldFrame);
+                getSavedGame();
+                renderFrame();
                 worldInitialized = true;
             } else if (c == 'N') {
                 StringBuilder seed = new StringBuilder();
+                clearLives();
+                clearMessage();
+                drawInstruction("Input seed (0 < seed <= 9,223,372,036,854,775,807), ending with 'S'.");
                 drawInitInfo("Seed: ");
                 while (true) {
                     char c1 = Character.toUpperCase(getNextKeyTyped());
                     if (Character.isDigit(c1)) {
+                        if (seed.isEmpty() && c1 == '0') {
+                            continue;
+                        }
                         seed.append(c1);
                         drawInitInfo("Seed: " + seed);
                     } else if (c1 == 'S') {
                         if (seed.isEmpty()) {
-                            drawInitInfo("Invalid Input! Please input random seed first!", 1000);
+                            drawInitInfo("Please input seed first!", 1000);
+                            drawInitInfo("Seed: ");
+                            continue;
+                        }
+                        if (!validSeed(seed)) {
+                            drawInitInfo("Seed must be in range (0, 9 223 372 036 854 775 807] !", 1000);
+                            seed = new StringBuilder();
+                            drawInitInfo("Seed: ");
                             continue;
                         }
                         random = new Random(Long.parseLong(seed.toString()));
-                        randomGenerateWorld(finalWorldFrame);
-                        renderFrame(finalWorldFrame);
+                        randomGenerateWorld();
+                        renderFrame();
                         worldInitialized = true;
                         break;
                     }
                 }
-            } else if (c == ':') {
-                if (!worldInitialized) {
-                    drawInitInfo(":");
-                }
-                char c1 = Character.toUpperCase(getNextKeyTyped());
-                if (c1 == 'Q') {
-                    if (!worldInitialized) {
-                        drawInitInfo(":Q", 500);
-                        flashInitInfo("No data can be saved!");
-                    } else {
-                        saveGame(finalWorldFrame);
+            } else if (worldInitialized) {
+                if (c == ':') {
+                    drawMessage(":");
+                    char c1 = Character.toUpperCase(getNextKeyTyped());
+                    if (c1 == 'Q') {
+                        drawMessage(":Q", 500);
+                        saveGame();
                         flashMessage("Game was Saved!", 1000);
-                    }
-                    break;
-                } else {
-                    if (worldInitialized) {
-                        drawMessage("Please enter :Q if you want to save and quit.", 2000);
+                        break;
                     } else {
-                        drawInitInfo(":" + c1, 500);
-                        drawInitInfo("Invalid Input!", 1000);
+                        drawMessage("Please enter :Q if you want to save and quit.", 1000);
                     }
-                }
-            } else if ("WASDGH".indexOf(c) >= 0) {
-                if (!worldInitialized) {
-                    drawInitInfo("No Game Exists!", 1000);
-                }
-                if (c == 'G') {
-                    randomToggleLight(finalWorldFrame);
-                } else if (c == 'H') {
-                    toggleAvatarSight(finalWorldFrame);
-                } else if (move(finalWorldFrame, c)) {
-                    break;
+                } else if ("WASDGH".indexOf(c) >= 0) {
+                    if (c == 'G') {
+                        randomToggleLight();
+                    } else if (c == 'H') {
+                        toggleAvatarSight();
+                    } else if (move(c)) {
+                        break;
+                    }
                 }
             }
-//            } else {
-//                drawMessage("Invalid Input! Please Try Again!", 1000);
-//            }
         }
         StdDraw.clear(Color.BLACK);
         drawInitInfo("Please Close the Game!");
     }
 
-    private void randomToggleLight(TETile[][] finalWorldFrame) {
-        Room room = roomsList.get(RandomUtils.uniform(random, roomsList.size()));
-        room.toggleLight(finalWorldFrame);
-        if (avatar.x >= room.getX() && avatar.x < room.getX() + room.getWidth() && avatar.y >= room.getY() && avatar.y < room.getY() + room.getHeight()) {
-            tileUnderAvatar = finalWorldFrame[avatar.x][avatar.y];
-            finalWorldFrame[avatar.x][avatar.y] = Tileset.AVATAR;
+    private boolean validSeed(StringBuilder seed) {
+        String maxLong = "9223372036854775807";
+        if (seed.length() == maxLong.length()) {
+            for (int i = 0; i < maxLong.length(); i++) {
+                if (seed.charAt(i) != maxLong.charAt(i)) {
+                    return seed.charAt(i) < maxLong.charAt(i);
+                }
+            }
         }
-        renderRoom(finalWorldFrame, room);
+        return seed.length() <= maxLong.length();
     }
-    private void toggleAvatarSight(TETile[][] tiles) {
+
+    private void randomToggleLight() {
+        Room room = roomsList.get(RandomUtils.uniform(random, roomsList.size()));
+        room.toggleLight(world);
+        renderRoom(room);
+    }
+    private void toggleAvatarSight() {
         this.avatarSightOnly = !this.avatarSightOnly;
-        renderFrame(tiles);
+        renderFrame();
     }
 
     private void flashMessage(String s, int flashTime) {
@@ -603,21 +596,36 @@ public class Engine {
         StdDraw.show();
     }
     private void drawInitInfo(String info, int ms) {
-        clearCanvas();
+        clearMap();
         StdDraw.setFont(INITINFOFONT);
         StdDraw.setPenColor(TEXTCOLOR);
         StdDraw.text(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, info);
         StdDraw.show(ms);
-        clearCanvas();
+        clearMap();
     }
     private void clearMap() {
         StdDraw.setPenColor(BACKGROUND);
         StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, WIDTH / 2.0, HEIGHT / 2.0);
         StdDraw.show();
     }
+    public void clearMessage() {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(MESSAGEPOS.x, MESSAGEPOS.y, WIDTH / 2.0 + XOFFSET - (livesPosStart.x + MAXINITLIVES + MAXTREASURES), YDOWNSET / 2.0);
+        StdDraw.show();
+    }
+    private void clearLives() {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(livesPosStart.x + (MAXINITLIVES + MAXTREASURES) / 2.0, HEIGHT + YDOWNSET / 2.0 + YOFFSET, (3 + MAXTREASURES) / 2.0, YDOWNSET / 2.0);
+        StdDraw.show();
+    }
+    private void clearInstruction() {
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(INSTRUCTIONPOS.x, INSTRUCTIONPOS.y, WIDTH / 2.0, YOFFSET / 2.0);
+        StdDraw.show();
+    }
     // draw message shown in the center
     private void drawInitInfo(String info) {
-        clearCanvas();
+        clearMap();
         StdDraw.setFont(INITINFOFONT);
         StdDraw.setPenColor(TEXTCOLOR);
         StdDraw.text(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, info);
@@ -664,28 +672,28 @@ public class Engine {
         // that works for many different input types.
         // initiate or retrieve random and world map
         String[] info = getInfo(input);
-        TETile[][] finalWorldFrame;
         initializeCanvas();
         if (!info[0].isEmpty()) {
             if (!hasSavedGame()) {
                 drawInitInfo("No previous game can be loaded!", 1000);
                 return null;
             } else {
-                finalWorldFrame = getSavedGame();
-                renderFrame(finalWorldFrame);
+                getSavedGame();
+                renderFrame();
             }
         } else {
             random = new Random(Long.parseLong(info[1]));
-            finalWorldFrame = new TETile[WIDTH][HEIGHT];
-            randomGenerateWorld(finalWorldFrame);
-            renderFrame(finalWorldFrame);
+            world = new TETile[WIDTH][HEIGHT];
+            fillTileWorldWithNothing();
+            randomGenerateWorld();
+            renderFrame();
             StdDraw.pause(500);
         }
         // for each action, move the avatar in the direction
         if (!info[2].isEmpty()) {
             for (int i = 0; i < info[2].length(); i++) {
-                if (move(finalWorldFrame, info[2].charAt(i))) {
-                    return finalWorldFrame;
+                if (move(info[2].charAt(i))) {
+                    return world;
                 }
                 StdDraw.pause(500);
             }
@@ -693,13 +701,13 @@ public class Engine {
 
         // save game
         if (!info[3].isEmpty()) {
-            saveGame(finalWorldFrame);
+            saveGame();
         }
-        return finalWorldFrame;
+        return world;
     }
 
-    private boolean move(TETile[][] finalWorldFrame, char c) {
-        // if lost all lives or success entering the door, return true, otherwise return false
+    private boolean move(char c) {
+        // if game ended, namely lost all lives or success entering the door, return true, otherwise return false
         int dx = 0;
         int dy = 0;
         if (c == 'W') {
@@ -713,17 +721,19 @@ public class Engine {
         }
         Position nextPos = new Position(avatar.x + dx, avatar.y + dy);
         // if next tile is wall
-        if (finalWorldFrame[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
+        if (world[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
             return false;
         } else if (nextPos.equal(door)) {
             // deal with door
-            congratulations(finalWorldFrame);
+            congratulations();
             return true;
         }
-
-        for (Position guardian: guardians) {
-            // deal with guardians
+        boolean meet = false;
+        // deal with guardians
+        for (int i = 0; i < guardians.size(); i++) {
+            Position guardian = guardians.get(i);
             if (nextPos.equal(guardian)) {
+                meet = true;
                 if (lives <= 0) {
                     // game is over, flash the message "Game Over!"
                     flashMessage("Game Over!", 1000);
@@ -731,34 +741,38 @@ public class Engine {
                     drawInitInfo("Game Over!", 2000);
                     return true;
                 }
-                deadOnce();
-                return false;
+                meetItem(guardian, Tileset.GUARDIAN, "You meet a Guardian! Dead Once!");
+                removeLiveOnce();
+                guardians.set(i, guardians.get(guardians.size() - 1));
+                break;
             }
+        }
+        if (meet) {
+            guardians.remove(guardians.size() - 1);
         }
         // deal with treasure
+        meet = false;
         for (int i = 0; i < treasures.size(); i++) {
             if (nextPos.equal(treasures.get(i))) {
-                openTreasure(treasures.get(i));
-                finalWorldFrame[nextPos.x][nextPos.y] = Tileset.WATER;
+                meet = true;
+                meetItem(nextPos, Tileset.TREASURE, "You found a treasure! Add live once!");
+                addLiveOnce();
                 treasures.set(i, treasures.get(treasures.size() - 1));
-                treasures.remove(treasures.size() - 1);
+                break;
             }
         }
-
-        // update world map
-        StdDraw.setFont(TILEFONT);
-        finalWorldFrame[avatar.x][avatar.y] = tileUnderAvatar;
-        drawTile(finalWorldFrame, avatar.x, avatar.y);
+        if (meet) {
+            treasures.remove(treasures.size() - 1);
+        }
+        // update canvas
+        drawTile(avatar.x, avatar.y);
         avatar = nextPos;
-        tileUnderAvatar = finalWorldFrame[avatar.x][avatar.y];
-        finalWorldFrame[avatar.x][avatar.y] = Tileset.AVATAR;
-        drawTile(finalWorldFrame, avatar.x, avatar.y);
+        drawTile(Tileset.AVATAR, avatar);
         if (avatarSightOnly) {
-            renderAvatarSightOnly(finalWorldFrame);
+            renderAvatarSightOnly();
         }
         StdDraw.show();
         return false;
-//        renderFrame(finalWorldFrame);
     }
 
     private void drawMessage(String message) {
@@ -774,23 +788,17 @@ public class Engine {
         clearMessage();
         StdDraw.setFont(MESSAGEFONT);
         StdDraw.setPenColor(TEXTCOLOR);
-        StdDraw.text(WIDTH / 2.0 + XOFFSET, YOFFSET + HEIGHT + YDOWNSET / 2.0, message);
+        StdDraw.text(MESSAGEPOS.x, MESSAGEPOS.y, message);
     }
-    public void clearMessage() {
-        StdDraw.setPenColor(BACKGROUND);
-        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, YOFFSET + HEIGHT + YDOWNSET / 2.0, 30, 1);
-        StdDraw.show();
-    }
+//    public void clearMessage() {
+//        StdDraw.setPenColor(BACKGROUND);
+//        StdDraw.filledRectangle(WIDTH / 2.0 + XOFFSET, YOFFSET + HEIGHT + YDOWNSET / 2.0, 30, 1);
+//        StdDraw.show();
+//    }
 
-    private void openTreasure(Position treasure) {
-        flashTile(treasure, Tileset.TREASURE, 1000, 200);
-        addLiveOnce();
-    }
-
-    private void deadOnce() {
-        drawMessage("Dead Once!");
-        flashTile(avatar, Tileset.AVATAR, 1000, 200);
-        removeLiveOnce();
+    private void meetItem(Position p, TETile tile, String s) {
+        drawMessage(s);
+        flashTile(p, tile, 1000, 200);
         clearMessage();
     }
 
@@ -798,21 +806,21 @@ public class Engine {
     private void flashTile(Position pos, TETile tile, int flashTime, int flashBreak) {
         StdDraw.setFont(TILEFONT);
         while (flashTime >= 0) {
-            Tileset.NOTHING.draw(pos.x + XOFFSET, pos.y + YOFFSET);
+            drawTile(Tileset.NOTHING, pos);
             StdDraw.show();
             StdDraw.pause(flashBreak);
-            tile.draw(pos.x + XOFFSET, pos.y + YOFFSET);
+            drawTile(tile, pos);
             StdDraw.show();
             StdDraw.pause(flashBreak);
             flashTime -= flashBreak;
         }
     }
 
-    private void congratulations(TETile[][] finalWorldFrame) {
-        finalWorldFrame[avatar.x][avatar.y] = tileUnderAvatar;
-        drawTile(finalWorldFrame, avatar.x, avatar.y);
-        finalWorldFrame[door.x][door.y] = Tileset.UNLOCKED_DOOR;
-        drawTile(finalWorldFrame, door.x, door.y);
+    private void congratulations() {
+        drawTile(avatar.x, avatar.y);
+        avatar = door;
+        world[door.x][door.y] = Tileset.UNLOCKED_DOOR;
+        drawTile(door.x, door.y);
         flashMessage("Congratulations!", 1000);
         StdDraw.show();
     }

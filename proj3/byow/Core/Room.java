@@ -5,6 +5,8 @@ import byow.TileEngine.Tileset;
 
 import java.awt.*;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class Room implements Serializable {
@@ -16,8 +18,18 @@ public class Room implements Serializable {
     private final boolean hasLight;
     private static final int LIGHTRANGE = 6;
     public static final Color LIGHTCOLOR = new Color(62, 78, 240);
+    public static final List<Color> lightColorWithRange = new ArrayList<>();
     public static final double BASE = 0.78;
     private boolean enableLight = false;
+    static {
+        for (int i = 0; i <= LIGHTRANGE; i++) {
+            double factor = Math.pow(BASE, i);
+            int redVal = (int) (LIGHTCOLOR.getRed() * factor);
+            int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);
+            int blueVal =  (int) (LIGHTCOLOR.getBlue() * factor);
+            lightColorWithRange.add(new Color(redVal, greenVal, blueVal));
+        }
+    }
     // generate a room with light
     public Room(int i, int j, int w, int h, Position light) {
         this.x = i;
@@ -79,22 +91,9 @@ public class Room implements Serializable {
         int t = Math.min(y + height, light.y + LIGHTRANGE + 1);
         for (int i = l; i < r; i++) {
             for (int j = b; j < t; j++) {
-                int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
-                // don't change back color if it is not floor or light
-                if (d != 0 && !tiles[i][j].equal(Tileset.FLOOR) && !tiles[i][j].equal(Tileset.AVATAR)) {
-                    continue;
-                }
-                if (d == 0) {
-                    tiles[i][j] = Tileset.LIGHT;
-                } else {
-                    tiles[i][j] = Tileset.FLOOR;
-                }
                 if (enableLight) {
-                    double factor = Math.pow(BASE, d);
-                    int redVal = (int) (LIGHTCOLOR.getRed() * factor);
-                    int greenVal =  (int) (LIGHTCOLOR.getGreen() * factor);
-                    int blueVal =  (int) (LIGHTCOLOR.getBlue() * factor);
-                    tiles[i][j] = tiles[i][j].changeBackgroundColor(new Color(redVal, greenVal, blueVal));
+                    int d = Math.max(Math.abs(light.x - i), Math.abs(light.y - j));
+                    tiles[i][j] = tiles[i][j].changeBackgroundColor(lightColorWithRange.get(d));
                 } else {
                     tiles[i][j] = tiles[i][j].changeBackgroundColor(Engine.BACKGROUND);
                 }
