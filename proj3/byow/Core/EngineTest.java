@@ -8,6 +8,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.awt.*;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,6 +30,16 @@ public class EngineTest {
     public void end() {
         StdDraw.pause(5000);
         StdDraw.clear(Color.BLACK);
+    }
+    @Test
+    public void hashMapTest() {
+        HashMap<Integer, Integer> prePos = new HashMap<>();
+        prePos.put(0, 1);
+        prePos.put(1, 1);
+        System.out.print(prePos.get(0).equals(prePos.get(1)));
+        prePos.put(2, new Integer(1));
+        prePos.put(3, new Integer(1));
+        System.out.print(prePos.get(2).equals(prePos.get(3)));
     }
     @Test
     public void showTest() {

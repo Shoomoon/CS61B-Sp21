@@ -7,9 +7,8 @@ import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.*;
 import java.io.File;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,21 +47,24 @@ public class Engine {
     //maximum treasures
     public static final int MAXTREASURES = 4;
     //maximum guardians
-    public static final int MAXGUARDIANS = 8;
+    public static final int MAXGUARDIANS = 3;
     // maximum initial lives
-    public static final int MAXINITLIVES = 3;
+    public static final int MAXINITLIVES = 1;
     public static final int SIGHTRANGE = 6;
     public static final Position MESSAGEPOS = new Position(WIDTH / 2 + XOFFSET, HEIGHT + YDOWNSET / 2 + YOFFSET);
     public static final Position INSTRUCTIONPOS = new Position(WIDTH / 2 + XOFFSET, YOFFSET / 2);
+    public static final int[][] dir = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     private TETile[][] world;
     private Position avatar;
     private Position door;
     private List<Position> treasures;
     private List<Position> guardians;
+    private List<List<Position>> guardiansChasePaths;
     private List<Room> roomsList;
-    private Integer lives;
+    private int lives;
     // Turn lights on or off, toggled with key 'H'
-    private Boolean avatarSightOnly = false;
+    private boolean avatarSightOnly = false;
+    private boolean chasePathDisplay = false;
 
 
     public void main(String[] args) {
@@ -84,6 +86,10 @@ public class Engine {
         } else {
             renderAvatarSightOnly();
         }
+        if (chasePathDisplay) {
+            showChasePaths();
+        }
+        showMovableItems();
         drawLives();
         drawInstruction();
         StdDraw.show();
@@ -112,13 +118,14 @@ public class Engine {
         StdDraw.setFont(TILEFONT);
         tile.draw(x + XOFFSET, y + YOFFSET);
     }
+
     private boolean inAvatarSight(Position p) {
         int d = Math.abs(p.x - avatar.x) + Math.abs(p.y - avatar.y);
         return d <= SIGHTRANGE;
     }
 
     private void drawInstruction() {
-        drawInstruction("Up(W) Down(S) Left(A) Right(D) Save & Quit(:Q) New Game(N) Randomly Toggle Light(G) Toggle Avatar Sight(H)");
+        drawInstruction("Up(W) Down(S) Left(A) Right(D) Save & Quit(:Q) New Game(N) Randomly Toggle Light(G) Avatar Sight(H) Chase Path(P)");
     }
     private void drawInstruction(String s) {
         clearInstruction();
@@ -140,6 +147,9 @@ public class Engine {
                 }
             }
         }
+        if (chasePathDisplay) {
+            showChasePaths();
+        }
         showMovableItems();
         StdDraw.show();
     }
@@ -151,10 +161,17 @@ public class Engine {
                 drawTile(avatar.x + i, avatar.y - d);
             }
         }
+        if (chasePathDisplay) {
+            showChasePaths();
+        }
         showMovableItems();
+    }
+    private void drawTile(Position p) {
+        drawTile(p.x, p.y);
     }
     private void drawTile(int i, int j) {
         if (i < 0 || i >= WIDTH || j < 0 || j >= HEIGHT) {
+            System.out.print("Invalid index!\n");
             return;
         }
         drawTile(world[i][j], i, j);
@@ -166,11 +183,13 @@ public class Engine {
             live.draw(livesPosStart.x + i, livesPosStart.y);
         }
     }
-    private void removeLiveOnce() {
-        lives -= 1;
+    private void lostLiveKTimes(int k) {
         StdDraw.setFont(TILEFONT);
-        Tileset.NOTHING.draw(livesPosStart.x + lives, livesPosStart.y);
-        StdDraw.show();
+        for (int i = 0; i < k; i++) {
+            lives -= 1;
+            Tileset.NOTHING.draw(livesPosStart.x + lives, livesPosStart.y);
+            StdDraw.show(200);
+        }
     }
     private void addLiveOnce() {
         StdDraw.setFont(TILEFONT);
@@ -217,7 +236,7 @@ public class Engine {
         avatar = items.get(0);
         treasures = new ArrayList<>(items.subList(1, treasuresCount + 1));
         guardians = new ArrayList<>(items.subList(treasuresCount + 1, 1 + treasuresCount + guardiansCount));
-
+        updateChasePaths();
         // random outgoing door
         door = randomGenerateDoor();
 
@@ -405,7 +424,7 @@ public class Engine {
         if (arg == null || arg.isEmpty()) {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
-        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHh]*)(?<end>:[Qq]?).*$";
+        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHhPp]*)(?<end>:[Qq]?).*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
@@ -433,7 +452,7 @@ public class Engine {
     }
 
     public void saveGame() {
-        Record currentGame = new Record(world, random, avatar, door, treasures, guardians, roomsList, lives, avatarSightOnly);
+        Record currentGame = new Record(world, random, avatar, door, treasures, guardians, guardiansChasePaths, roomsList, lives, avatarSightOnly, chasePathDisplay);
         Utiles.writeObject(SAVEDGAME, currentGame);
     }
 
@@ -444,10 +463,12 @@ public class Engine {
         avatar = savedGame.getAvatar();
         door = savedGame.getDoor();
         guardians = savedGame.getGuardians();
+        guardiansChasePaths = savedGame.getGuardiansChasePath();
         treasures = savedGame.getTreasures();
         roomsList = savedGame.getRoomsList();
         lives = savedGame.getLives();
         avatarSightOnly = savedGame.getAvatarSightOnly();
+        chasePathDisplay = savedGame.getChasePathDisplay();
     }
 
     private void initializeCanvas() {
@@ -460,7 +481,7 @@ public class Engine {
      * Method used for exploring a fresh world. This method should handle all inputs,
      * including inputs from the main menu.
      */
-    public void interactWithKeyboard() {
+    public TETile[][] interactWithKeyboard() {
         initializeCanvas();
         world = new TETile[WIDTH][HEIGHT];
         fillTileWorldWithNothing();
@@ -530,11 +551,13 @@ public class Engine {
                     } else {
                         drawMessage("Please enter :Q if you want to save and quit.", 1000);
                     }
-                } else if ("WASDGH".indexOf(c) >= 0) {
+                } else if ("WASDGHP".indexOf(c) >= 0) {
                     if (c == 'G') {
                         randomToggleLight();
                     } else if (c == 'H') {
                         toggleAvatarSight();
+                    } else if (c == 'P') {
+                        toggleChasePath();
                     } else if (move(c)) {
                         break;
                     }
@@ -543,6 +566,18 @@ public class Engine {
         }
         StdDraw.clear(Color.BLACK);
         drawInitInfo("Please Close the Game!");
+        return world;
+    }
+
+    private void toggleChasePath() {
+        chasePathDisplay = !chasePathDisplay;
+        if (!chasePathDisplay) {
+            clearChasePaths();
+        } else {
+            showChasePaths();
+        }
+        showMovableItems();
+        StdDraw.show();
     }
 
     private boolean validSeed(StringBuilder seed) {
@@ -699,6 +734,8 @@ public class Engine {
                     randomToggleLight();
                 } else if (c == 'H') {
                     toggleAvatarSight();
+                } else if (c == 'P') {
+                    toggleChasePath();
                 } else if (move(c)) {
                     return world;
                 }
@@ -726,60 +763,158 @@ public class Engine {
         } else if (c == 'D') {
             dx = 1;
         }
-        Position nextPos = new Position(avatar.x + dx, avatar.y + dy);
-        // if next tile is wall
-        if (world[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
-            return false;
-        } else if (nextPos.equal(door)) {
-            // deal with door
+        Position nextAvatarPos = new Position(avatar, dx, dy);
+        if (nextAvatarPos.equal(door)) {
             congratulations();
             return true;
         }
-        boolean meet = false;
-        // deal with guardians
-        for (int i = 0; i < guardians.size(); i++) {
+
+        if (world[nextAvatarPos.x][nextAvatarPos.y].equal(Tileset.WALL)) {
+            nextAvatarPos = avatar;
+        } else {
+            boolean meet = false;
+            for (int i = 0; i < treasures.size(); i++) {
+                if (nextAvatarPos.equal(treasures.get(i))) {
+                    meet = true;
+                    meetItem(nextAvatarPos, Tileset.TREASURE, "You found a treasure! Add live once!");
+                    addLiveOnce();
+                    drawTile(treasures.get(i));
+                    treasures.set(i, treasures.get(treasures.size() - 1));
+                    break;
+                }
+            }
+            if (meet) {
+                treasures = treasures.subList(0, treasures.size() - 1);
+            }
+        }
+
+        int countGuardiansMeet = 0;
+        for (int i = 0; i < guardians.size() - countGuardiansMeet; i++) {
             Position guardian = guardians.get(i);
-            if (nextPos.equal(guardian)) {
-                meet = true;
-                if (lives <= 0) {
+            Position nextGuardianPos = guardiansChasePaths.get(i).get(0);
+            if (nextAvatarPos.equal(guardian) || nextGuardianPos.equal(nextAvatarPos)) {
+                countGuardiansMeet += 1;
+                if (lives < countGuardiansMeet) {
+                    lives -= countGuardiansMeet;
                     // game is over, flash the message "Game Over!"
                     flashMessage("Game Over!", 1000);
                     clearMap();
                     drawInitInfo("Game Over!", 2000);
                     return true;
                 }
-                meetItem(guardian, Tileset.GUARDIAN, "You meet a Guardian! Dead Once!");
-                removeLiveOnce();
-                guardians.set(i, guardians.get(guardians.size() - 1));
+                drawTile(guardian);
+                guardians.set(i, guardians.get(guardians.size() - countGuardiansMeet));
+                guardiansChasePaths.set(i, guardiansChasePaths.get(guardiansChasePaths.size() - countGuardiansMeet));
+                i -= 1;
                 break;
             }
         }
-        if (meet) {
-            guardians.remove(guardians.size() - 1);
+        if (countGuardiansMeet > 0) {
+            meetItem(avatar, Tileset.AVATAR, String.format("You meet %d Guardians! Lost %d lives!", countGuardiansMeet, countGuardiansMeet));
+            lostLiveKTimes(countGuardiansMeet);
+            guardians = guardians.subList(0, guardians.size() - countGuardiansMeet);
         }
-        // deal with treasure
-        meet = false;
-        for (int i = 0; i < treasures.size(); i++) {
-            if (nextPos.equal(treasures.get(i))) {
-                meet = true;
-                meetItem(nextPos, Tileset.TREASURE, "You found a treasure! Add live once!");
-                addLiveOnce();
-                treasures.set(i, treasures.get(treasures.size() - 1));
-                break;
-            }
-        }
-        if (meet) {
-            treasures.remove(treasures.size() - 1);
-        }
+
         // update canvas
-        drawTile(avatar.x, avatar.y);
-        avatar = nextPos;
-        drawTile(Tileset.AVATAR, avatar);
+        // update guardians and avatar position and show
+        clearMovableItems();
+        avatar = nextAvatarPos;
+        for (int i = 0; i < guardians.size(); i++) {
+            guardians.set(i, guardiansChasePaths.get(i).get(0));
+        }
         if (avatarSightOnly) {
             renderAvatarSightOnly();
         }
+        // update chase paths
+        if (chasePathDisplay) {
+            clearChasePaths();
+        }
+        updateChasePaths();
+        if (chasePathDisplay) {
+            showChasePaths();
+        }
+        showMovableItems();
         StdDraw.show();
         return false;
+    }
+    private void clearMovableItems() {
+        drawTile(avatar);
+        for (Position guardian: guardians) {
+            drawTile(guardian);
+        }
+        for (Position treasure: treasures) {
+            drawTile(treasure);
+        }
+    }
+
+
+    private void updateChasePaths() {
+        // start from avatar, use bfs to find the minimum path to every guardian
+        guardiansChasePaths = new ArrayList<>();
+        HashMap<Integer, Position> prePos = new HashMap<>();
+        Queue<Position> toVisit = new LinkedList<>();
+        prePos.put(avatar.val, null);
+        toVisit.add(avatar);
+        HashSet<Integer> guardiansSet = new HashSet<>();
+        for (Position guardian: guardians) {
+            guardiansSet.add(guardian.val);
+        }
+        int guardiansFound = 0;
+        while (guardiansFound < guardians.size()) {
+            Position curPos = toVisit.poll();
+            for (int i = 0; i < 4; i++) {
+                assert curPos != null;
+                Position nextPos = new Position(curPos, dir[i][0], dir[i][1]);
+                if (!validPosition(nextPos)) {
+                    continue;
+                }
+                if (!prePos.containsKey(nextPos.val) && !world[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
+                    prePos.put(nextPos.val, curPos);
+                    toVisit.add(nextPos);
+                    if (guardiansSet.contains(nextPos.val)) {
+                        guardiansFound += 1;
+                    }
+                }
+            }
+        }
+        for (Position guardian: guardians) {
+            List<Position> path = new ArrayList<>();
+            Position p = prePos.get(guardian.val);
+            while (p != null) {
+                path.add(p);
+                p = prePos.get(p.val);
+            }
+            guardiansChasePaths.add(path);
+        }
+    }
+    private boolean validPosition(Position p) {
+        return p.x >= 0 && p.x < WIDTH && p.y >= 0 && p.y < HEIGHT;
+    }
+    private void clearChasePaths() {
+        for (List<Position> path: guardiansChasePaths) {
+            for (Position p: path) {
+                if (!avatarSightOnly || inAvatarSight(p)) {
+                    drawTile(p);
+                }
+            }
+        }
+        showMovableItems();
+        StdDraw.show();
+    }
+
+    private void showChasePaths() {
+        StdDraw.setFont();
+        StdDraw.setPenColor(Color.RED);
+        for (List<Position> path: guardiansChasePaths) {
+            for (Position p : path) {
+                if (!avatarSightOnly || inAvatarSight(p)) {
+                    StdDraw.text(p.x + XOFFSET + 0.5, p.y + YOFFSET + 0.5, Character.toString('-'));
+                }
+            }
+        }
+        // redraw avatar since avatar tile has been drown text "-" previously.
+        drawTile(avatar);
+        StdDraw.show();
     }
 
     private void drawMessage(String message) {

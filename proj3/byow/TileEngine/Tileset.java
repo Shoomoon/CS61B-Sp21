@@ -38,6 +38,7 @@ public class Tileset {
     public static final TETile TREASURE = FLOWER;
     public static final TETile LIGHT = new TETile('◉', new Color(128, 192, 128), new Color(62, 78, 240),
             "light");
+    public static final TETile PATH = new TETile('-', Color.black, Color.red, "path");
 }
 
 
