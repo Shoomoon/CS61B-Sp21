@@ -47,7 +47,7 @@ public class Engine {
     //maximum treasures
     public static final int MAXTREASURES = 4;
     //maximum guardians
-    public static final int MAXGUARDIANS = 3;
+    public static final int MAXGUARDIANS = 4;
     // maximum initial lives
     public static final int MAXINITLIVES = 1;
     public static final int SIGHTRANGE = 6;
@@ -424,11 +424,12 @@ public class Engine {
         if (arg == null || arg.isEmpty()) {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
-        String regex = "^((?<load>[Ll])|([Nn](?<seed>[1-9]\\d*)[Ss]))(?<actions>[WwAaSsDdGgHhPp]*)(?<end>:[Qq]?).*$";
+        arg = arg.toUpperCase();
+        String regex = "^((?<load>L)|(N(?<seed>[1-9]\\d*)S))(?<actions>[WASDGHP]*)(?<end>(:Q)?).*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
-            throw new IllegalArgumentException("Input argument should start with L/l or N/n + digits + S/s，followed by actions W/wA/aS/sD/dG/gH/h, and maybe end with :Q/q" +
+            throw new IllegalArgumentException("Input argument should start with L/l or N/n + digits + S/s，followed by actions W/wA/aS/sD/dG/gH/hP/p, and maybe end with :Q/q" +
                     "for example N12335SSSAW:Q, LWSSW:Q, N2464S, N8544S:Q.");
         }
         // capture load, seed, actions, and end requirement
@@ -488,7 +489,7 @@ public class Engine {
         boolean worldInitialized = false;
         drawMenu();
         while (true) {
-            char c = Character.toUpperCase(getNextKeyTyped());
+            char c = getNextKeyTyped();
             if (c == 'L') {
                 if (worldInitialized) {
                     drawMessage(String.valueOf(c), 500);
@@ -513,7 +514,7 @@ public class Engine {
                 drawInstruction("Input seed (0 < seed <= 9,223,372,036,854,775,807), ending with 'S'.");
                 drawInitInfo("Seed: ");
                 while (true) {
-                    char c1 = Character.toUpperCase(getNextKeyTyped());
+                    char c1 = getNextKeyTyped();
                     if (Character.isDigit(c1)) {
                         if (seed.isEmpty() && c1 == '0') {
                             continue;
@@ -542,7 +543,7 @@ public class Engine {
             } else if (worldInitialized) {
                 if (c == ':') {
                     drawMessage(":");
-                    char c1 = Character.toUpperCase(getNextKeyTyped());
+                    char c1 = getNextKeyTyped();
                     if (c1 == 'Q') {
                         drawMessage(":Q", 500);
                         saveGame();
@@ -720,6 +721,8 @@ public class Engine {
             }
         } else {
             random = new Random(Long.parseLong(info[1]));
+            drawInitInfo("Seed: " + info[1]);
+            StdDraw.pause(1000);
             world = new TETile[WIDTH][HEIGHT];
             fillTileWorldWithNothing();
             randomGenerateWorld();
@@ -729,7 +732,7 @@ public class Engine {
         // for each action, move the avatar in the direction
         if (!info[2].isEmpty()) {
             for (int i = 0; i < info[2].length(); i++) {
-                char c = Character.toUpperCase(info[2].charAt(i));
+                char c = info[2].charAt(i);
                 if (c == 'G') {
                     randomToggleLight();
                 } else if (c == 'H') {
@@ -745,7 +748,9 @@ public class Engine {
 
         // save game
         if (!info[3].isEmpty()) {
+            drawMessage(":Q", 500);
             saveGame();
+            flashMessage("Game was Saved!", 1000);
         }
         return world;
     }
@@ -908,11 +913,11 @@ public class Engine {
         for (List<Position> path: guardiansChasePaths) {
             for (Position p : path) {
                 if (!avatarSightOnly || inAvatarSight(p)) {
-                    StdDraw.text(p.x + XOFFSET + 0.5, p.y + YOFFSET + 0.5, Character.toString('-'));
+                    StdDraw.text(p.x + XOFFSET + 0.5, p.y + YOFFSET + 0.5, "•");
                 }
             }
         }
-        // redraw avatar since avatar tile has been drown text "-" previously.
+        // redraw avatar since avatar tile has been drawn text "-" previously.
         drawTile(avatar);
         StdDraw.show();
     }
