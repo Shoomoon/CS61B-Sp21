@@ -21,7 +21,7 @@ public class Engine {
     public static final int WIDTH = 80;
     public static final int HEIGHT = 60;
     public static final double ROOMPROBABILITY = 0.01;
-    public static final double CONNECTROOMPROBABILITY = 0.5;
+    public static final double CONNECTROOMPROBABILITY = 0.3;
     public static final int MINROOMWIDTH = 3;
     public static final int MAXROOMWIDTH = 10;
     public static final int MINROOMHEIGHT = 3;
@@ -393,8 +393,13 @@ public class Engine {
         int width = RandomUtils.uniform(random, MINROOMWIDTH, 1 + Math.min(WIDTH - i - 1, MAXROOMWIDTH));
         int maxHeight = Math.min(HEIGHT - j - 1, MAXROOMHEIGHT);
         for (Room r: roomsList) {
+            // // at least 1 tile horizontally between 2 rooms
+            if (r.getX() + r.getWidth() == i && i >= r.getX() && i < r.getY() + r.getHeight()) {
+                return null;
+            }
+            // at least 1 tile vertically between 2 rooms
             if (r.getX() + r.getWidth() - 1 >= i && r.getY() > j) {
-                maxHeight = Math.min(maxHeight, r.getY() - j);
+                maxHeight = Math.min(maxHeight, r.getY() - j - 1);
             }
         }
         if (maxHeight < MINROOMHEIGHT) {
@@ -489,7 +494,7 @@ public class Engine {
         boolean worldInitialized = false;
         drawMenu();
         while (true) {
-            char c = getNextKeyTyped();
+            char c = Character.toUpperCase(getNextKeyTyped());
             if (c == 'L') {
                 if (worldInitialized) {
                     drawMessage(String.valueOf(c), 500);
@@ -514,7 +519,7 @@ public class Engine {
                 drawInstruction("Input seed (0 < seed <= 9,223,372,036,854,775,807), ending with 'S'.");
                 drawInitInfo("Seed: ");
                 while (true) {
-                    char c1 = getNextKeyTyped();
+                    char c1 = Character.toUpperCase(getNextKeyTyped());
                     if (Character.isDigit(c1)) {
                         if (seed.isEmpty() && c1 == '0') {
                             continue;
@@ -543,7 +548,7 @@ public class Engine {
             } else if (worldInitialized) {
                 if (c == ':') {
                     drawMessage(":");
-                    char c1 = getNextKeyTyped();
+                    char c1 = Character.toUpperCase(getNextKeyTyped());
                     if (c1 == 'Q') {
                         drawMessage(":Q", 500);
                         saveGame();
