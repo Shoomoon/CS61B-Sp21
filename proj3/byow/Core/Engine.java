@@ -231,8 +231,8 @@ public class Engine {
         }
         // random generate avatar, treasures and guardians
         int treasuresCount = RandomUtils.uniform(random, 1, MAXTREASURES + 1);
-        int guardiansCount = RandomUtils.uniform(random, 1, MAXGUARDIANS + 1);
-        List<Position> items = randomGenerateMultiPos(1 + treasuresCount + guardiansCount);
+        int guardiansCount = RandomUtils.uniform(random, 2, MAXGUARDIANS + 1);
+        List<Position> items = randomSelectMultiPos(world, 1 + treasuresCount + guardiansCount);
         avatar = items.get(0);
         treasures = new ArrayList<>(items.subList(1, treasuresCount + 1));
         guardians = new ArrayList<>(items.subList(treasuresCount + 1, 1 + treasuresCount + guardiansCount));
@@ -243,13 +243,13 @@ public class Engine {
         avatarSightOnly = false;
     }
 
-    private List<Position> randomGenerateMultiPos(int size) {
+    private List<Position> randomSelectMultiPos(TETile[][] tiles, int size) {
         // uniformly select size arraylist from tiles
         List<Position> res = new ArrayList<>();
         int floorCount = 0;
-        for (int i = 0; i < world.length; i++) {
-            for (int j = 0; j < world[0].length; j++) {
-                if (world[i][j].equal(Tileset.FLOOR)) {
+        for (int i = 0; i < tiles.length; i++) {
+            for (int j = 0; j < tiles[0].length; j++) {
+                if (tiles[i][j].equal(Tileset.FLOOR)) {
                     floorCount += 1;
                     int k = RandomUtils.uniform(random, floorCount);
                     if (floorCount <= size) {
@@ -786,15 +786,17 @@ public class Engine {
             for (int i = 0; i < treasures.size(); i++) {
                 if (nextAvatarPos.equal(treasures.get(i))) {
                     meet = true;
-                    meetItem(nextAvatarPos, Tileset.TREASURE, "You found a treasure! Add live once!");
-                    addLiveOnce();
-                    drawTile(treasures.get(i));
+//                    meetItem(nextAvatarPos, Tileset.TREASURE, "You found a treasure! Add live once!");
+//                    addLiveOnce();
+//                    drawTile(treasures.get(i));
                     treasures.set(i, treasures.get(treasures.size() - 1));
                     break;
                 }
             }
             if (meet) {
                 treasures = treasures.subList(0, treasures.size() - 1);
+                coinsCollection();
+                renderFrame();
             }
         }
 
@@ -816,7 +818,6 @@ public class Engine {
                 guardians.set(i, guardians.get(guardians.size() - countGuardiansMeet));
                 guardiansChasePaths.set(i, guardiansChasePaths.get(guardiansChasePaths.size() - countGuardiansMeet));
                 i -= 1;
-                break;
             }
         }
         if (countGuardiansMeet > 0) {
@@ -847,6 +848,91 @@ public class Engine {
         StdDraw.show();
         return false;
     }
+    private void coinsCollection() {
+        clearCanvas();
+        drawInitInfo("You have 10 seconds to collect all of the coins! Good luck!", 1000);
+        int w = 20;
+        int h = 10;
+        int curXOffset = WIDTH / 2 - w / 2;
+        int curYOffset = YOFFSET + 1;
+        TETile coinTile = Tileset.LIGHT;
+        TETile curFloorTile = Tileset.FLOOR.changeBackgroundColor(new Color(62, 78, 240));
+        TETile curWall = Tileset.WALL;
+        TETile[][] coinsCollectWorld = new TETile[w][h];
+        int coinsTotal = 5;
+        int coinsCollected = 0;
+        // draw walls and floors
+        StdDraw.setFont(TILEFONT);
+        for (int i = 0; i < w; i++) {
+            for (int j = 0; j < h; j++) {
+                coinsCollectWorld[i][j] = curFloorTile;
+                curFloorTile.draw(i + curXOffset, j + curYOffset);
+            }
+            curWall.draw(i + curXOffset, -1 + curYOffset);
+            curWall.draw(i + curXOffset, h + curYOffset);
+        }
+        for (int j = -1; j <= h; j++) {
+            curWall.draw(-1 + curXOffset, j + curYOffset);
+            curWall.draw(w + curXOffset, j + curYOffset);
+        }
+        List<Position> coins = randomSelectMultiPos(coinsCollectWorld, coinsTotal + 1);
+        for (Position coin: coins) {
+            coinsCollectWorld[coin.x][coin.y] = coinTile;
+            coinTile.draw(coin.x + curXOffset, coin.y + curYOffset);
+        }
+        Position curAvatar = coins.get(0);
+        Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
+        StdDraw.show();
+        final boolean[] finished = {false};
+        Timer timer = new Timer(true);
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                finished[0] = true;
+            }
+        };
+        timer.schedule(task, 10000);
+        while (!finished[0]) {
+            if (StdDraw.hasNextKeyTyped()) {
+                char c = Character.toUpperCase(StdDraw.nextKeyTyped());
+                Position nextAvatarPos;
+                if (c == 'W') {
+                    nextAvatarPos = new Position(curAvatar, 0, 1);
+                } else if (c == 'A') {
+                    nextAvatarPos = new Position(curAvatar, -1, 0);
+                } else if (c == 'S') {
+                    nextAvatarPos = new Position(curAvatar, 0, -1);
+                } else if (c == 'D') {
+                    nextAvatarPos = new Position(curAvatar, 1, 0);
+                } else {
+                    continue;
+                }
+                if (!validPosition(nextAvatarPos, w, h)) {
+                    continue;
+                }
+                if (coinsCollectWorld[nextAvatarPos.x][nextAvatarPos.y].equal(coinTile)) {
+                    coinsCollected += 1;
+                    if (coinsCollected == coinsTotal) {
+                        finished[0] = true;
+                    }
+                }
+                coinsCollectWorld[curAvatar.x][curAvatar.y] = curFloorTile;
+                curFloorTile.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
+                curAvatar = nextAvatarPos;
+                coinsCollectWorld[curAvatar.x][curAvatar.y] = Tileset.AVATAR;
+                Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
+                StdDraw.show();
+            }
+        }
+        clearCanvas();
+        if (coinsCollected >= coinsTotal) {
+            lives += 1;
+            drawInitInfo("You got all of the coins! Nice work! Add live once!");
+        } else {
+            drawInitInfo("Oops! You lost a change to gain an extra live!");
+        }
+        StdDraw.pause(1000);
+    }
     private void clearMovableItems() {
         drawTile(avatar);
         for (Position guardian: guardians) {
@@ -865,24 +951,22 @@ public class Engine {
         Queue<Position> toVisit = new LinkedList<>();
         prePos.put(avatar.val, null);
         toVisit.add(avatar);
-        HashSet<Integer> guardiansSet = new HashSet<>();
-        for (Position guardian: guardians) {
-            guardiansSet.add(guardian.val);
-        }
         int guardiansFound = 0;
         while (guardiansFound < guardians.size()) {
             Position curPos = toVisit.poll();
             for (int i = 0; i < 4; i++) {
                 assert curPos != null;
                 Position nextPos = new Position(curPos, dir[i][0], dir[i][1]);
-                if (!validPosition(nextPos)) {
+                if (!validPosition(nextPos, WIDTH, HEIGHT)) {
                     continue;
                 }
                 if (!prePos.containsKey(nextPos.val) && !world[nextPos.x][nextPos.y].equal(Tileset.WALL)) {
                     prePos.put(nextPos.val, curPos);
                     toVisit.add(nextPos);
-                    if (guardiansSet.contains(nextPos.val)) {
-                        guardiansFound += 1;
+                    for (Position guardian: guardians) {
+                        if (guardian.equal(nextPos)) {
+                            guardiansFound += 1;
+                        }
                     }
                 }
             }
@@ -897,8 +981,8 @@ public class Engine {
             guardiansChasePaths.add(path);
         }
     }
-    private boolean validPosition(Position p) {
-        return p.x >= 0 && p.x < WIDTH && p.y >= 0 && p.y < HEIGHT;
+    private boolean validPosition(Position p, int width, int height) {
+        return p.x >= 0 && p.x < width && p.y >= 0 && p.y < height;
     }
     private void clearChasePaths() {
         for (List<Position> path: guardiansChasePaths) {
