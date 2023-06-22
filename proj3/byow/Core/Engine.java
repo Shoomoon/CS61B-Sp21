@@ -65,6 +65,9 @@ public class Engine {
     // Turn lights on or off, toggled with key 'H'
     private boolean avatarSightOnly = false;
     private boolean chasePathDisplay = false;
+    private StringBuilder commandRecord;
+    private long randomSeed;
+    private int commandReplayIndex = -1;
 
 
     public void main(String[] args) {
@@ -75,7 +78,6 @@ public class Engine {
         if (!BLOBS.exists()) {
             BLOBS.mkdir();
         }
-        lives = MAXINITLIVES;
     }
     public void renderFrame() {
         clearCanvas();
@@ -171,7 +173,7 @@ public class Engine {
     }
     private void drawTile(int i, int j) {
         if (i < 0 || i >= WIDTH || j < 0 || j >= HEIGHT) {
-            System.out.print("Invalid index!\n");
+//            System.out.print("Invalid index!\n");
             return;
         }
         drawTile(world[i][j], i, j);
@@ -241,6 +243,9 @@ public class Engine {
         door = randomGenerateDoor();
 
         avatarSightOnly = false;
+        chasePathDisplay = false;
+        lives = MAXINITLIVES;
+        commandRecord = new StringBuilder();
     }
 
     private List<Position> randomSelectMultiPos(TETile[][] tiles, int size) {
@@ -430,7 +435,7 @@ public class Engine {
             throw new IllegalArgumentException("Input argument should not be empty.");
         }
         arg = arg.toUpperCase();
-        String regex = "^((?<load>L)|(N(?<seed>[1-9]\\d*)S))(?<actions>[WASDGHP]*)(?<end>(:Q)?).*$";
+        String regex = "^((?<load>L)|(N(?<seed>[1-9]\\d*)S)|(?<replay>R))(?<actions>[WASDGHP$]*)(?<end>(:Q)?).*$";
         Pattern p = Pattern.compile(regex);
         Matcher m = p.matcher(arg);
         if (!m.matches()) {
@@ -442,11 +447,12 @@ public class Engine {
         String inputSeed = m.replaceAll("${seed}");
         String actions = m.replaceAll("${actions}");
         String end = m.replaceAll("${end}");
+        String replay = m.replaceAll("${replay}");
 //        System.out.println(load);
 //        System.out.println(inputSeed);
 //        System.out.println(actions);
 //        System.out.println(end);
-        return new String[]{load, inputSeed, actions, end};
+        return new String[]{load, inputSeed, actions, end, replay};
     }
     public void clearRecord() {
         if (SAVEDGAME.exists()) {
@@ -456,9 +462,13 @@ public class Engine {
     public boolean hasSavedGame() {
         return SAVEDGAME.exists();
     }
+    private Record toRecord() {
+        return new Record(world, random, avatar, door, treasures, guardians, guardiansChasePaths,
+                roomsList, lives, avatarSightOnly, chasePathDisplay, commandRecord, randomSeed);
+    }
 
     public void saveGame() {
-        Record currentGame = new Record(world, random, avatar, door, treasures, guardians, guardiansChasePaths, roomsList, lives, avatarSightOnly, chasePathDisplay);
+        Record currentGame = toRecord();
         Utiles.writeObject(SAVEDGAME, currentGame);
     }
 
@@ -475,6 +485,8 @@ public class Engine {
         lives = savedGame.getLives();
         avatarSightOnly = savedGame.getAvatarSightOnly();
         chasePathDisplay = savedGame.getChasePathDisplay();
+        commandRecord = savedGame.getCommandRecord();
+        randomSeed = savedGame.getSeed();
     }
 
     private void initializeCanvas() {
@@ -489,66 +501,45 @@ public class Engine {
      */
     public TETile[][] interactWithKeyboard() {
         initializeCanvas();
-        world = new TETile[WIDTH][HEIGHT];
-        fillTileWorldWithNothing();
-        boolean worldInitialized = false;
         drawMenu();
         while (true) {
-            char c = Character.toUpperCase(getNextKeyTyped());
-            if (c == 'L') {
-                if (worldInitialized) {
-                    drawMessage(String.valueOf(c), 500);
-                    if (!hasSavedGame()) {
-                        drawMessage("No previous game can be loaded!", 1000);
-                        continue;
-                    }
+            char c0 = getNextKeyTypedUpperCase();
+            if (c0 == 'L') {
+                drawInitInfo(String.valueOf(c0), 500);
+                if (!hasSavedGame()) {
+                    drawInitInfo("No previous game can be loaded!", 1000);
+                    drawMenu();
                 } else {
-                    drawInitInfo(String.valueOf(c), 500);
-                    if (!hasSavedGame()) {
-                        drawInitInfo("No previous game can be loaded!", 1000);
-                        continue;
-                    }
+                    getSavedGame();
+                    renderFrame();
+                    break;
                 }
-                getSavedGame();
+            } else if (c0 == 'N') {
+                generateNewGame();
+                break;
+            } else if (c0 == 'R') {
+                replayGame();
+                break;
+            }
+        }
+        while (true) {
+            char c = getNextKeyTypedUpperCase();
+            if (c == 'L') {
+                drawInitInfo(String.valueOf(c), 500);
+                if (!hasSavedGame()) {
+                    drawInitInfo("No previous game can be loaded!", 1000);
+                } else {
+                    getSavedGame();
+                }
                 renderFrame();
-                worldInitialized = true;
             } else if (c == 'N') {
-                StringBuilder seed = new StringBuilder();
-                clearLives();
-                clearMessage();
-                drawInstruction("Input seed (0 < seed <= 9,223,372,036,854,775,807), ending with 'S'.");
-                drawInitInfo("Seed: ");
-                while (true) {
-                    char c1 = Character.toUpperCase(getNextKeyTyped());
-                    if (Character.isDigit(c1)) {
-                        if (seed.isEmpty() && c1 == '0') {
-                            continue;
-                        }
-                        seed.append(c1);
-                        drawInitInfo("Seed: " + seed);
-                    } else if (c1 == 'S') {
-                        if (seed.isEmpty()) {
-                            drawInitInfo("Please input seed first!", 1000);
-                            drawInitInfo("Seed: ");
-                            continue;
-                        }
-                        if (!validSeed(seed)) {
-                            drawInitInfo("Seed must be in range (0, 9 223 372 036 854 775 807] !", 1000);
-                            seed = new StringBuilder();
-                            drawInitInfo("Seed: ");
-                            continue;
-                        }
-                        random = new Random(Long.parseLong(seed.toString()));
-                        randomGenerateWorld();
-                        renderFrame();
-                        worldInitialized = true;
-                        break;
-                    }
-                }
-            } else if (worldInitialized) {
+                generateNewGame();
+            } else if (c == 'R') {
+                replayGame();
+            } else {
                 if (c == ':') {
                     drawMessage(":");
-                    char c1 = Character.toUpperCase(getNextKeyTyped());
+                    char c1 = getNextKeyTypedUpperCase();
                     if (c1 == 'Q') {
                         drawMessage(":Q", 500);
                         saveGame();
@@ -558,6 +549,7 @@ public class Engine {
                         drawMessage("Please enter :Q if you want to save and quit.", 1000);
                     }
                 } else if ("WASDGHP".indexOf(c) >= 0) {
+                    commandRecord.append(c);
                     if (c == 'G') {
                         randomToggleLight();
                     } else if (c == 'H') {
@@ -573,6 +565,46 @@ public class Engine {
         StdDraw.clear(Color.BLACK);
         drawInitInfo("Please Close the Game!");
         return world;
+    }
+
+    private void generateNewGame() {
+        world = new TETile[WIDTH][HEIGHT];
+        fillTileWorldWithNothing();
+        randomSeed = getInputSeed();
+        random = new Random(randomSeed);
+        randomGenerateWorld();
+        renderFrame();
+    }
+
+    private Long getInputSeed() {
+        clearCanvas();
+        drawInitInfo("Seed: ");
+        drawInstruction("Input seed (0 < seed <= 9,223,372,036,854,775,807), ending with 'S'.");
+        StringBuilder seed = new StringBuilder();
+        while (true) {
+            char c = getNextKeyTypedUpperCase();
+            if (Character.isDigit(c)) {
+                if (seed.isEmpty() && c == '0') {
+                    continue;
+                }
+                seed.append(c);
+                drawInitInfo("Seed: " + seed);
+            } else if (c == 'S') {
+                if (seed.isEmpty()) {
+                    drawInitInfo("Please input seed first!", 1000);
+                    drawInitInfo("Seed: ");
+                    continue;
+                }
+                if (!validSeed(seed)) {
+                    drawInitInfo("Seed must be in range (0, 9 223 372 036 854 775 807] !", 1000);
+                    seed = new StringBuilder();
+                    drawInitInfo("Seed: ");
+                    continue;
+                }
+                break;
+            }
+        }
+        return Long.parseLong(seed.toString());
     }
 
     private void toggleChasePath() {
@@ -635,7 +667,8 @@ public class Engine {
         StdDraw.setFont(INITINFOFONT);
         StdDraw.text(centerX, centerY + 2, "New Game (N)");
         StdDraw.text(centerX, centerY, "Load Game (L)");
-        StdDraw.text(centerX, centerY - 2, "Quit (Q)");
+        StdDraw.text(centerX, centerY - 2, "Replay (R)");
+        StdDraw.text(centerX, centerY - 4, "Quit (Q)");
         StdDraw.show();
     }
     private void drawInitInfo(String info, int ms) {
@@ -675,10 +708,11 @@ public class Engine {
         StdDraw.show();
     }
 
-    private char getNextKeyTyped() {
+    private char getNextKeyTypedUpperCase() {
         while (true) {
             if (StdDraw.hasNextKeyTyped()) {
-                return StdDraw.nextKeyTyped();
+                char c = Character.toUpperCase(StdDraw.nextKeyTyped());
+                return c;
             }
         }
     }
@@ -724,20 +758,33 @@ public class Engine {
                 getSavedGame();
                 renderFrame();
             }
-        } else {
-            random = new Random(Long.parseLong(info[1]));
+        } else if (!info[1].isEmpty()) {
             drawInitInfo("Seed: " + info[1]);
             StdDraw.pause(1000);
+            randomSeed = Long.parseLong(info[1]);
+            random = new Random(randomSeed);
             world = new TETile[WIDTH][HEIGHT];
             fillTileWorldWithNothing();
             randomGenerateWorld();
             renderFrame();
             StdDraw.pause(500);
+        } else {
+            replayGame();
         }
         // for each action, move the avatar in the direction
+        // in replay mode, commandRecord equals to info[2]
         if (!info[2].isEmpty()) {
-            for (int i = 0; i < info[2].length(); i++) {
+            if (commandReplayIndex >= 0) {
+                commandRecord = new StringBuilder(info[2]);
+            }
+            for (int i = 0; i < info[2].length();) {
                 char c = info[2].charAt(i);
+                // if in replay mode, increment commandReplayIndex and don't record, otherwise just append c
+                if (commandReplayIndex < 0) {
+                    commandRecord.append(c);
+                } else {
+                    commandReplayIndex += 1;
+                }
                 if (c == 'G') {
                     randomToggleLight();
                 } else if (c == 'H') {
@@ -747,7 +794,8 @@ public class Engine {
                 } else if (move(c)) {
                     return world;
                 }
-                StdDraw.pause(500);
+                i = Math.max(i + 1, commandReplayIndex);
+                StdDraw.pause(300);
             }
         }
 
@@ -760,6 +808,12 @@ public class Engine {
         return world;
     }
 
+    private void replayGame() {
+        getSavedGame();
+        commandReplayIndex = 0;
+        interactWithInputString("N" + randomSeed + "S" + commandRecord.toString());
+        commandReplayIndex = -1;
+    }
     private boolean move(char c) {
         // if game ended, namely lost all lives or success entering the door, return true, otherwise return false
         int dx = 0;
@@ -794,8 +848,9 @@ public class Engine {
                 }
             }
             if (meet) {
-                treasures = treasures.subList(0, treasures.size() - 1);
+                treasures = new ArrayList<>(treasures.subList(0, treasures.size() - 1));
                 coinsCollection();
+                commandReplayIndex += 1;
                 renderFrame();
             }
         }
@@ -823,7 +878,7 @@ public class Engine {
         if (countGuardiansMeet > 0) {
             meetItem(avatar, Tileset.AVATAR, String.format("You meet %d Guardians! Lost %d lives!", countGuardiansMeet, countGuardiansMeet));
             lostLiveKTimes(countGuardiansMeet);
-            guardians = guardians.subList(0, guardians.size() - countGuardiansMeet);
+            guardians = new ArrayList<>(guardians.subList(0, guardians.size() - countGuardiansMeet));
         }
 
         // update canvas
@@ -850,7 +905,7 @@ public class Engine {
     }
     private void coinsCollection() {
         clearCanvas();
-        drawInitInfo("You have 10 seconds to collect all of the coins! Good luck!", 1000);
+        drawInitInfo("You have 10 seconds to collect all of the coins! Good luck!", 2000);
         int w = 20;
         int h = 10;
         int curXOffset = WIDTH / 2 - w / 2;
@@ -884,44 +939,81 @@ public class Engine {
         Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
         StdDraw.show();
         final boolean[] finished = {false};
-        Timer timer = new Timer(true);
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                finished[0] = true;
-            }
-        };
-        timer.schedule(task, 10000);
-        while (!finished[0]) {
-            if (StdDraw.hasNextKeyTyped()) {
-                char c = Character.toUpperCase(StdDraw.nextKeyTyped());
-                Position nextAvatarPos;
-                if (c == 'W') {
-                    nextAvatarPos = new Position(curAvatar, 0, 1);
-                } else if (c == 'A') {
-                    nextAvatarPos = new Position(curAvatar, -1, 0);
-                } else if (c == 'S') {
-                    nextAvatarPos = new Position(curAvatar, 0, -1);
-                } else if (c == 'D') {
-                    nextAvatarPos = new Position(curAvatar, 1, 0);
-                } else {
-                    continue;
+        if (commandReplayIndex < 0) {
+            Timer timer = new Timer(true);
+            TimerTask task = new TimerTask() {
+                @Override
+                public void run() {
+                    finished[0] = true;
                 }
-                if (!validPosition(nextAvatarPos, w, h)) {
+            };
+            timer.schedule(task, 10000);
+            while (!finished[0]) {
+                if (StdDraw.hasNextKeyTyped()) {
+                    char c = Character.toUpperCase(StdDraw.nextKeyTyped());
+                    Position nextAvatarPos;
+                    int dx = 0;
+                    int dy = 0;
+                    if (c == 'W') {
+                        dy = 1;
+                    } else if (c == 'A') {
+                        dx = -1;
+                    } else if (c == 'S') {
+                        dy = -1;
+                    } else if (c == 'D') {
+                        dx = 1;
+                    }
+                    nextAvatarPos = new Position(curAvatar, dx, dy);
+                    if (dx == 0 && dy == 0 || !validPosition(nextAvatarPos, w, h)) {
+                        continue;
+                    }
+                    commandRecord.append(c);
+                    if (coinsCollectWorld[nextAvatarPos.x][nextAvatarPos.y].equal(coinTile)) {
+                        coinsCollected += 1;
+                        if (coinsCollected == coinsTotal) {
+                            finished[0] = true;
+                        }
+                    }
+                    coinsCollectWorld[curAvatar.x][curAvatar.y] = curFloorTile;
+                    curFloorTile.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
+                    curAvatar = nextAvatarPos;
+                    coinsCollectWorld[curAvatar.x][curAvatar.y] = Tileset.AVATAR;
+                    Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
+                    StdDraw.show();
+                }
+            }
+            // add symbol '$' indicate that operations in coinCollection end
+            commandRecord.append('$');
+        } else {
+            char c = commandRecord.charAt(commandReplayIndex);
+            while (c != '$') {
+                commandReplayIndex += 1;
+                Position nextAvatarPos;
+                int dx = 0;
+                int dy = 0;
+                if (c == 'W') {
+                    dy = 1;
+                } else if (c == 'A') {
+                    dx = -1;
+                } else if (c == 'S') {
+                    dy = -1;
+                } else if (c == 'D') {
+                    dx = 1;
+                }
+                nextAvatarPos = new Position(curAvatar, dx, dy);
+                c = commandRecord.charAt(commandReplayIndex);
+                if (dx == 0 && dy == 0 || !validPosition(nextAvatarPos, w, h)) {
                     continue;
                 }
                 if (coinsCollectWorld[nextAvatarPos.x][nextAvatarPos.y].equal(coinTile)) {
                     coinsCollected += 1;
-                    if (coinsCollected == coinsTotal) {
-                        finished[0] = true;
-                    }
                 }
                 coinsCollectWorld[curAvatar.x][curAvatar.y] = curFloorTile;
                 curFloorTile.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
                 curAvatar = nextAvatarPos;
                 coinsCollectWorld[curAvatar.x][curAvatar.y] = Tileset.AVATAR;
                 Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
-                StdDraw.show();
+                StdDraw.show(300);
             }
         }
         clearCanvas();

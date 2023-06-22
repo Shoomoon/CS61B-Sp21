@@ -21,9 +21,11 @@ public class Record implements Serializable {
     // Turn lights on or off, toggled with key 'H'
     private boolean avatarSightOnly;
     private boolean chasePathDisplay;
+    private StringBuilder commandRecord;
+    private long seed;
     public Record(TETile[][] world, Random random, Position avatar, Position door,
                   List<Position> treasures, List<Position> guardians, List<List<Position>> guardiansChasePath, List<Room> roomsList,
-                  int lives, boolean avatarSightOnly, boolean chasePathDisplay) {
+                  int lives, boolean avatarSightOnly, boolean chasePathDisplay, StringBuilder commandRecord, long seed) {
         this.world = world;
         this.random = random;
         this.avatar = avatar;
@@ -35,6 +37,8 @@ public class Record implements Serializable {
         this.lives = lives;
         this.avatarSightOnly = avatarSightOnly;
         this.chasePathDisplay = chasePathDisplay;
+        this.commandRecord = commandRecord;
+        this.seed = seed;
     }
 
     public TETile[][] getWorld() {
@@ -77,5 +81,13 @@ public class Record implements Serializable {
     }
     public List<List<Position>> getGuardiansChasePath() {
         return guardiansChasePath;
+    }
+
+    public StringBuilder getCommandRecord() {
+        return commandRecord;
+    }
+
+    public long getSeed() {
+        return seed;
     }
 }
