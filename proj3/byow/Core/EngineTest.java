@@ -7,6 +7,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import javax.swing.*;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,7 +55,7 @@ public class EngineTest {
         StdDraw.show();
     }
     @Test
-    public void messageTest(){
+    public void messageTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         // first make engine.printMessage public
         // change engine.printMessage to private at the end
         String arg = "N543SWWWWAA";
@@ -67,12 +68,12 @@ public class EngineTest {
         StdDraw.pause(2000);
     }
     @Test
-    public void livesDrawTest() {
+    public void livesDrawTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String arg = "N543SWWWWAA";
         engine.main(new String[] {arg});
     }
     @Test
-    public void saveTest() {
+    public void saveTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         world = new TETile[1][1];
         world[0][0] = Tileset.WALL;
         engine.random = new Random(100);
@@ -96,7 +97,7 @@ public class EngineTest {
         }
     }
     @Test
-    public void randomGenerateWorldAndActionTest() {
+    public void randomGenerateWorldAndActionTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Random rand = new Random(453151489);
         String arg = "N" + rand.nextInt(475753) + "S" + "WDASAA:Q";
         engine.main(new String[] {arg});
@@ -104,7 +105,7 @@ public class EngineTest {
         engine.main(new String[] {arg});
     }
     @Test
-    public void reloadAndActionTest() {
+    public void reloadAndActionTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String arg = "LWASDDDDDD:Q";
         engine.main(new String[]{arg});
     }
@@ -119,7 +120,7 @@ public class EngineTest {
         assertEquals(false, t2.equal(t0));
     }
     @Test
-    public void initialTest() {
+    public void initialTest() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         engine.clearRecord();
         try {
             String arg13 = "LWWDS:Q";

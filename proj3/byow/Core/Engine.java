@@ -5,10 +5,13 @@ import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
 import edu.princeton.cs.introcs.StdDraw;
 
+import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.File;
 import java.util.*;
 import java.util.List;
+import java.util.Timer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -70,7 +73,7 @@ public class Engine {
     private int commandReplayIndex = -1;
 
 
-    public void main(String[] args) {
+    public void main(String[] args) throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Engine engine = new Engine();
         world = engine.interactWithInputString(args[0]);
     }
@@ -467,13 +470,43 @@ public class Engine {
                 roomsList, lives, avatarSightOnly, chasePathDisplay, commandRecord, randomSeed);
     }
 
-    public void saveGame() {
+    public void saveGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Record currentGame = toRecord();
+        File savedGameFile = SAVEDGAME;
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        JFileChooser jdir = new JFileChooser(BLOBS);
+        jdir.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("Game record file (*.txt)", "txt");
+        jdir.setFileFilter(filter);
+        jdir.setDialogTitle("Save The Game");
+        if (JFileChooser.APPROVE_OPTION == jdir.showSaveDialog(null)) {
+            File fileSelected = jdir.getSelectedFile();
+            String fileName = fileSelected.getName();
+            int indexOfDot = fileName.indexOf('.');
+            if (indexOfDot >= 0) {
+                fileName = fileName.substring(0, indexOfDot);
+            }
+            savedGameFile = new File(fileSelected.getParent(), fileName + ".txt");
+        }
+        drawMessage(String.format("Game was saved as %s", savedGameFile.getName()), 1000);
+        Utiles.writeObject(savedGameFile, currentGame);
+        // always duplicate to default file SAVEDGAME
         Utiles.writeObject(SAVEDGAME, currentGame);
     }
 
-    public void getSavedGame() {
-        Record savedGame = Utiles.readObject(SAVEDGAME, Record.class);
+    public boolean getSavedGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        File savedGameFile = null;
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        JFileChooser jdir = new JFileChooser(BLOBS);
+        jdir.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("Game record file (*.txt)", "txt");
+        jdir.setFileFilter(filter);
+        jdir.setDialogTitle("Choose the game that you want to load");
+        if (JFileChooser.APPROVE_OPTION != jdir.showOpenDialog(null)) {
+            return false;
+        }
+        savedGameFile = jdir.getSelectedFile();
+        Record savedGame = Utiles.readObject(savedGameFile, Record.class);
         world = savedGame.getWorld();
         random = savedGame.getRandom();
         avatar = savedGame.getAvatar();
@@ -487,6 +520,7 @@ public class Engine {
         chasePathDisplay = savedGame.getChasePathDisplay();
         commandRecord = savedGame.getCommandRecord();
         randomSeed = savedGame.getSeed();
+        return true;
     }
 
     private void initializeCanvas() {
@@ -499,7 +533,7 @@ public class Engine {
      * Method used for exploring a fresh world. This method should handle all inputs,
      * including inputs from the main menu.
      */
-    public TETile[][] interactWithKeyboard() {
+    public TETile[][] interactWithKeyboard() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         initializeCanvas();
         drawMenu();
         while (true) {
@@ -510,9 +544,13 @@ public class Engine {
                     drawInitInfo("No previous game can be loaded!", 1000);
                     drawMenu();
                 } else {
-                    getSavedGame();
-                    renderFrame();
-                    break;
+                    if (!getSavedGame()) {
+                        drawInitInfo("No game selected!", 1000);
+                        drawMenu();
+                    } else {
+                        renderFrame();
+                        break;
+                    }
                 }
             } else if (c0 == 'N') {
                 generateNewGame();
@@ -520,18 +558,23 @@ public class Engine {
             } else if (c0 == 'R') {
                 replayGame();
                 break;
+            } else if (c0 == 'Q') {
+                return null;
             }
         }
         while (true) {
             char c = getNextKeyTypedUpperCase();
             if (c == 'L') {
-                drawInitInfo(String.valueOf(c), 500);
+                drawMessage(String.valueOf(c), 500);
                 if (!hasSavedGame()) {
-                    drawInitInfo("No previous game can be loaded!", 1000);
+                    drawMessage("No previous game can be loaded!", 1000);
                 } else {
-                    getSavedGame();
+                    if (!getSavedGame()) {
+                        drawMessage("No game selected!", 1000);
+                    } else {
+                        renderFrame();
+                    }
                 }
-                renderFrame();
             } else if (c == 'N') {
                 generateNewGame();
             } else if (c == 'R') {
@@ -543,7 +586,6 @@ public class Engine {
                     if (c1 == 'Q') {
                         drawMessage(":Q", 500);
                         saveGame();
-                        flashMessage("Game was Saved!", 1000);
                         break;
                     } else {
                         drawMessage("Please enter :Q if you want to save and quit.", 1000);
@@ -739,7 +781,7 @@ public class Engine {
      * @param input the input string to feed to your program
      * @return the 2D TETile[][] representing the state of the world
      */
-    public TETile[][] interactWithInputString(String input) {
+    public TETile[][] interactWithInputString(String input) throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         // TODO: Fill out this method so that it run the engine using the input
         // passed in as an argument, and return a 2D tile representation of the
         // world that would have been drawn if the same inputs had been given
@@ -755,7 +797,9 @@ public class Engine {
                 drawInitInfo("No previous game can be loaded!", 1000);
                 return null;
             } else {
-                getSavedGame();
+                while (!getSavedGame()) {
+                    drawInitInfo("You must choose a game record to load!", 1000);
+                }
                 renderFrame();
             }
         } else if (!info[1].isEmpty()) {
@@ -808,7 +852,7 @@ public class Engine {
         return world;
     }
 
-    private void replayGame() {
+    private void replayGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         getSavedGame();
         commandReplayIndex = 0;
         interactWithInputString("N" + randomSeed + "S" + commandRecord.toString());
