@@ -9,6 +9,8 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.File;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.Timer;
@@ -43,7 +45,7 @@ public class Engine {
     public static final Font INSTRUCTIONFONT = new Font("Monaco", Font.BOLD, 16);
     // The directory to store world maps and variables
     public static final File BLOBS = new File(System.getProperty("user.dir"), ".maps");
-    public static final File SAVEDGAME = new File(BLOBS, "savedGame.txt");
+    public static final File LATESSAVEDTGAME = new File(BLOBS, "latestSavedGame.txt");
     public static final Position livesPosStart = new Position(2, HEIGHT + YOFFSET + YDOWNSET / 2);
     public static final Color BACKGROUND = Color.BLACK;
     public static final Color TEXTCOLOR = Color.WHITE;
@@ -71,6 +73,9 @@ public class Engine {
     private StringBuilder commandRecord;
     private long randomSeed;
     private int commandReplayIndex = -1;
+    private final Timer timer = new Timer();
+    private final DateTimeFormatter dft = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+
 
 
     public void main(String[] args) throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -81,6 +86,21 @@ public class Engine {
         if (!BLOBS.exists()) {
             BLOBS.mkdir();
         }
+        Timer timer = new Timer();
+        TimerTask showTime = new TimerTask() {
+            @Override
+            public void run() {
+                StdDraw.setPenColor(BACKGROUND);
+                StdDraw.filledRectangle(WIDTH + XOFFSET - 10, MESSAGEPOS.y, 10, 2);
+                Font fontNow = StdDraw.getFont();
+                StdDraw.setFont(new Font("Monaco", Font.BOLD, 20));
+                StdDraw.setPenColor(TEXTCOLOR);
+                StdDraw.text(WIDTH + XOFFSET - 10, MESSAGEPOS.y, dft.format(LocalDateTime.now()));
+                StdDraw.setFont(fontNow);
+                StdDraw.show();
+            }
+        };
+        timer.schedule(showTime, 500, 200);
     }
     public void renderFrame() {
         clearCanvas();
@@ -458,12 +478,12 @@ public class Engine {
         return new String[]{load, inputSeed, actions, end, replay};
     }
     public void clearRecord() {
-        if (SAVEDGAME.exists()) {
-            SAVEDGAME.delete();
+        if (LATESSAVEDTGAME.exists()) {
+            LATESSAVEDTGAME.delete();
         }
     }
     public boolean hasSavedGame() {
-        return SAVEDGAME.exists();
+        return LATESSAVEDTGAME.exists();
     }
     private Record toRecord() {
         return new Record(world, random, avatar, door, treasures, guardians, guardiansChasePaths,
@@ -472,7 +492,7 @@ public class Engine {
 
     public void saveGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         Record currentGame = toRecord();
-        File savedGameFile = SAVEDGAME;
+        File savedGameFile = LATESSAVEDTGAME;
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         JFileChooser jdir = new JFileChooser(BLOBS);
         jdir.setFileSelectionMode(JFileChooser.FILES_ONLY);
@@ -491,7 +511,7 @@ public class Engine {
         drawMessage(String.format("Game was saved as %s", savedGameFile.getName()), 1000);
         Utiles.writeObject(savedGameFile, currentGame);
         // always duplicate to default file SAVEDGAME
-        Utiles.writeObject(SAVEDGAME, currentGame);
+        Utiles.writeObject(LATESSAVEDTGAME, currentGame);
     }
 
     public boolean getSavedGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -536,6 +556,7 @@ public class Engine {
     public TETile[][] interactWithKeyboard() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         initializeCanvas();
         drawMenu();
+
         while (true) {
             char c0 = getNextKeyTypedUpperCase();
             if (c0 == 'L') {
@@ -577,8 +598,6 @@ public class Engine {
                 }
             } else if (c == 'N') {
                 generateNewGame();
-            } else if (c == 'R') {
-                replayGame();
             } else {
                 if (c == ':') {
                     drawMessage(":");
@@ -700,17 +719,17 @@ public class Engine {
         drawInitInfo(s);
     }
     private void drawMenu() {
+        String[] menu = new String[]{"New Game (N)", "Load Game (L)", "Replay (R)", "Quit (Q)"};
         clearCanvas();
         double centerX = WIDTH / 2.0 + XOFFSET;
-        double centerY = HEIGHT / 2.0  + YOFFSET;
+        double centerY = HEIGHT / 2.0  + YOFFSET + 8;
         StdDraw.setPenColor(TEXTCOLOR);
         StdDraw.setFont(new Font("Monaco", Font.BOLD, 60));
-        StdDraw.text(centerX, centerY + 8, "CS61B: THE GAME");
+        StdDraw.text(centerX, centerY, "CS61B: THE GAME");
         StdDraw.setFont(INITINFOFONT);
-        StdDraw.text(centerX, centerY + 2, "New Game (N)");
-        StdDraw.text(centerX, centerY, "Load Game (L)");
-        StdDraw.text(centerX, centerY - 2, "Replay (R)");
-        StdDraw.text(centerX, centerY - 4, "Quit (Q)");
+        for (int i = 0; i < menu.length; i++) {
+            StdDraw.text(centerX, centerY - 4 - 2 * i, menu[i]);
+        }
         StdDraw.show();
     }
     private void drawInitInfo(String info, int ms) {
@@ -853,7 +872,10 @@ public class Engine {
     }
 
     private void replayGame() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        getSavedGame();
+        while (!getSavedGame()) {
+            drawInitInfo("You must select a game record to replay!", 1000);
+            drawMenu();
+        }
         commandReplayIndex = 0;
         interactWithInputString("N" + randomSeed + "S" + commandRecord.toString());
         commandReplayIndex = -1;
