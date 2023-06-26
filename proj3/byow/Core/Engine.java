@@ -73,8 +73,9 @@ public class Engine {
     private StringBuilder commandRecord;
     private long randomSeed;
     private int commandReplayIndex = -1;
-    private final Timer timer = new Timer();
+    private final Timer timer = new Timer(true);
     private final DateTimeFormatter dft = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+    private final int COINCOLLECTTIME = 10;
 
 
 
@@ -86,21 +87,25 @@ public class Engine {
         if (!BLOBS.exists()) {
             BLOBS.mkdir();
         }
-        Timer timer = new Timer();
         TimerTask showTime = new TimerTask() {
             @Override
             public void run() {
-                StdDraw.setPenColor(BACKGROUND);
-                StdDraw.filledRectangle(WIDTH + XOFFSET - 10, MESSAGEPOS.y, 10, 2);
-                Font fontNow = StdDraw.getFont();
-                StdDraw.setFont(new Font("Monaco", Font.BOLD, 20));
-                StdDraw.setPenColor(TEXTCOLOR);
-                StdDraw.text(WIDTH + XOFFSET - 10, MESSAGEPOS.y, dft.format(LocalDateTime.now()));
-                StdDraw.setFont(fontNow);
-                StdDraw.show();
+                messageHelper(WIDTH + XOFFSET - 8, MESSAGEPOS.y, 10, 2, dft.format(LocalDateTime.now()), new Font("Monaco", Font.BOLD, 20), TEXTCOLOR);
             }
         };
         timer.schedule(showTime, 500, 200);
+    }
+    private synchronized void messageHelper(double centerX, double centerY, double halfWidth, double halfHeight, String message, Font font, Color color) {
+        Font fontBegin = StdDraw.getFont();
+        Color colorBegin = StdDraw.getPenColor();
+        StdDraw.setPenColor(BACKGROUND);
+        StdDraw.filledRectangle(centerX, centerY, halfWidth, halfHeight);
+        StdDraw.setFont(font);
+        StdDraw.setPenColor(TEXTCOLOR);
+        StdDraw.text(centerX, centerY, message);
+        StdDraw.setFont(fontBegin);
+        StdDraw.setPenColor(colorBegin);
+        StdDraw.show();
     }
     public void renderFrame() {
         clearCanvas();
@@ -618,6 +623,7 @@ public class Engine {
                     } else if (c == 'P') {
                         toggleChasePath();
                     } else if (move(c)) {
+                        gameEnd();
                         break;
                     }
                 }
@@ -626,6 +632,13 @@ public class Engine {
         StdDraw.clear(Color.BLACK);
         drawInitInfo("Please Close the Game!");
         return world;
+    }
+
+    private void gameEnd() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        drawInitInfo("Press N to start a new game or any other keys to quit!");
+        if (getNextKeyTypedUpperCase() == 'N') {
+            interactWithKeyboard();
+        }
     }
 
     private void generateNewGame() {
@@ -707,7 +720,7 @@ public class Engine {
             drawMessage("", 200);
             flashTime -= 200;
         }
-        drawMessage(s);
+        drawMessage("");
     }
     private void flashInitInfo(String s) {
         int t = 1000;
@@ -747,7 +760,8 @@ public class Engine {
     }
     public void clearMessage() {
         StdDraw.setPenColor(BACKGROUND);
-        StdDraw.filledRectangle(MESSAGEPOS.x, MESSAGEPOS.y, WIDTH / 2.0 + XOFFSET - (livesPosStart.x + MAXINITLIVES + MAXTREASURES), YDOWNSET / 2.0);
+//        StdDraw.filledRectangle(MESSAGEPOS.x, MESSAGEPOS.y, WIDTH / 2.0 + XOFFSET - (livesPosStart.x + MAXINITLIVES + MAXTREASURES), YDOWNSET / 2.0);
+        StdDraw.filledRectangle(MESSAGEPOS.x, MESSAGEPOS.y, 20, YDOWNSET / 2.0);
         StdDraw.show();
     }
     private void clearLives() {
@@ -855,6 +869,7 @@ public class Engine {
                 } else if (c == 'P') {
                     toggleChasePath();
                 } else if (move(c)) {
+                    gameEnd();
                     return world;
                 }
                 i = Math.max(i + 1, commandReplayIndex);
@@ -916,7 +931,6 @@ public class Engine {
             if (meet) {
                 treasures = new ArrayList<>(treasures.subList(0, treasures.size() - 1));
                 coinsCollection();
-                commandReplayIndex += 1;
                 renderFrame();
             }
         }
@@ -927,22 +941,23 @@ public class Engine {
             Position nextGuardianPos = guardiansChasePaths.get(i).get(0);
             if (nextAvatarPos.equal(guardian) || nextGuardianPos.equal(nextAvatarPos)) {
                 countGuardiansMeet += 1;
-                if (lives < countGuardiansMeet) {
-                    lives -= countGuardiansMeet;
-                    // game is over, flash the message "Game Over!"
-                    flashMessage("Game Over!", 1000);
-                    clearMap();
-                    drawInitInfo("Game Over!", 2000);
-                    return true;
-                }
                 drawTile(guardian);
                 guardians.set(i, guardians.get(guardians.size() - countGuardiansMeet));
                 guardiansChasePaths.set(i, guardiansChasePaths.get(guardiansChasePaths.size() - countGuardiansMeet));
                 i -= 1;
             }
         }
+
         if (countGuardiansMeet > 0) {
             meetItem(avatar, Tileset.AVATAR, String.format("You meet %d Guardians! Lost %d lives!", countGuardiansMeet, countGuardiansMeet));
+            if (lives < countGuardiansMeet) {
+                // game is over, flash the message "Game Over!"
+                lostLiveKTimes(lives);
+                flashMessage("Game Over!", 1000);
+                clearMap();
+                drawInitInfo("Game Over!", 2000);
+                return true;
+            }
             lostLiveKTimes(countGuardiansMeet);
             guardians = new ArrayList<>(guardians.subList(0, guardians.size() - countGuardiansMeet));
         }
@@ -1006,14 +1021,25 @@ public class Engine {
         StdDraw.show();
         final boolean[] finished = {false};
         if (commandReplayIndex < 0) {
-            Timer timer = new Timer(true);
+            final double[] timeLeft = {10.0};
+            Timer timerCoin = new Timer(true);
+            TimerTask showCoinTime = new TimerTask() {
+                @Override
+                public void run() {
+                    messageHelper(WIDTH / 2.0 + XOFFSET, HEIGHT / 2.0 + YOFFSET, 5, 2, String.format("%.1f", timeLeft[0]), new Font("Monaco", Font.BOLD, 30), TEXTCOLOR);
+                    timeLeft[0] -= 0.1;
+                    StdDraw.show();
+                }
+            };
+            timerCoin.schedule(showCoinTime, 0, 100);
+
             TimerTask task = new TimerTask() {
                 @Override
                 public void run() {
                     finished[0] = true;
                 }
             };
-            timer.schedule(task, 10000);
+            timer.schedule(task, COINCOLLECTTIME * 1000);
             while (!finished[0]) {
                 if (StdDraw.hasNextKeyTyped()) {
                     char c = Character.toUpperCase(StdDraw.nextKeyTyped());
@@ -1049,6 +1075,7 @@ public class Engine {
                 }
             }
             // add symbol '$' indicate that operations in coinCollection end
+            timerCoin.cancel();
             commandRecord.append('$');
         } else {
             char c = commandRecord.charAt(commandReplayIndex);
@@ -1081,6 +1108,7 @@ public class Engine {
                 Tileset.AVATAR.draw(curAvatar.x + curXOffset, curAvatar.y + curYOffset);
                 StdDraw.show(300);
             }
+            commandReplayIndex += 1;
         }
         clearCanvas();
         if (coinsCollected >= coinsTotal) {
