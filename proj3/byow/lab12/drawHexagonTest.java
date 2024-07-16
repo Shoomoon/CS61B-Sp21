@@ -3,7 +3,7 @@ package byow.lab12;
 import byow.TileEngine.TERenderer;
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
-import edu.princeton.cs.introcs.StdDraw;
+import edu.princeton.cs.algs4.StdDraw;
 import org.junit.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;

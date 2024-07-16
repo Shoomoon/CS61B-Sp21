@@ -2,7 +2,7 @@ package byow.Core;
 
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
-import edu.princeton.cs.introcs.StdDraw;
+import edu.princeton.cs.algs4.StdDraw;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

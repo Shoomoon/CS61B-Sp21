@@ -3,7 +3,7 @@ package byow.Core;
 import byow.TileEngine.TERenderer;
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
-import edu.princeton.cs.introcs.StdDraw;
+import edu.princeton.cs.algs4.StdDraw;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -1039,7 +1039,7 @@ public class Engine {
                     finished[0] = true;
                 }
             };
-            timer.schedule(task, COINCOLLECTTIME * 1000);
+            timerCoin.schedule(task, COINCOLLECTTIME * 1000);
             while (!finished[0]) {
                 if (StdDraw.hasNextKeyTyped()) {
                     char c = Character.toUpperCase(StdDraw.nextKeyTyped());
